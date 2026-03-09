@@ -21,7 +21,19 @@ export default function UsersPage() {
   }
 
   useEffect(() => {
-    fetchUsers();
+    let mounted = true;
+
+    fetch("/api/users")
+      .then((res) => res.json())
+      .then((data: User[]) => {
+        if (mounted) {
+          setUsers(data);
+        }
+      });
+
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -68,62 +80,81 @@ export default function UsersPage() {
   }
 
   return (
-    <main style={{ padding: 24 }}>
-      <h1>CRUD Users</h1>
+    <section className="space-y-5">
+      <div className="rounded-2xl border border-slate-200 bg-white/80 p-6 shadow-sm">
+        <h1 className="text-2xl font-bold text-slate-900">CRUD Users</h1>
+        <p className="mt-1 text-sm text-slate-600">Tambah, edit, dan hapus user dari database.</p>
+      </div>
 
-      <form onSubmit={handleSubmit} style={{ marginBottom: 24 }}>
-        <input
-          type="text"
-          placeholder="Nama"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          style={{ marginRight: 8 }}
-        />
-        <input
-          type="email"
-          placeholder="Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          style={{ marginRight: 8 }}
-        />
-        <button type="submit">
-          {editingId !== null ? "Update User" : "Tambah User"}
-        </button>
-
-        {editingId !== null && (
+      <div className="rounded-2xl border border-slate-200 bg-white/90 p-5 shadow-sm">
+        <form onSubmit={handleSubmit} className="grid gap-3 md:grid-cols-[1fr_1fr_auto_auto] md:items-center">
+          <input
+            type="text"
+            placeholder="Nama"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className="h-10 rounded-lg border border-slate-300 px-3 text-sm outline-none ring-0 transition focus:border-sky-500"
+          />
+          <input
+            type="email"
+            placeholder="Email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="h-10 rounded-lg border border-slate-300 px-3 text-sm outline-none ring-0 transition focus:border-sky-500"
+          />
           <button
-            type="button"
-            onClick={() => {
-              setEditingId(null);
-              setName("");
-              setEmail("");
-            }}
-            style={{ marginLeft: 8 }}
+            type="submit"
+            className="h-10 rounded-lg bg-slate-900 px-4 text-sm font-semibold text-white transition hover:bg-slate-700"
           >
-            Batal
+            {editingId !== null ? "Update User" : "Tambah User"}
           </button>
-        )}
-      </form>
 
-      <ul>
-        {users.map((user) => (
-          <li key={user.id} style={{ marginBottom: 12 }}>
-            <strong>{user.name}</strong> - {user.email}
+          {editingId !== null && (
             <button
-              onClick={() => handleEdit(user)}
-              style={{ marginLeft: 8 }}
+              type="button"
+              onClick={() => {
+                setEditingId(null);
+                setName("");
+                setEmail("");
+              }}
+              className="h-10 rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
             >
-              Edit
+              Batal
             </button>
-            <button
-              onClick={() => handleDelete(user.id)}
-              style={{ marginLeft: 8 }}
+          )}
+        </form>
+      </div>
+
+      <div className="rounded-2xl border border-slate-200 bg-white/90 p-5 shadow-sm">
+        <ul className="space-y-3">
+          {users.map((user) => (
+            <li
+              key={user.id}
+              className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 md:flex-row md:items-center md:justify-between"
             >
-              Hapus
-            </button>
-          </li>
-        ))}
-      </ul>
-    </main>
+              <div>
+                <p className="font-semibold text-slate-900">{user.name}</p>
+                <p className="text-sm text-slate-600">{user.email}</p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => handleEdit(user)}
+                  className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                >
+                  Edit
+                </button>
+                <button
+                  onClick={() => handleDelete(user.id)}
+                  className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-medium text-rose-700 transition hover:bg-rose-100"
+                >
+                  Hapus
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </section>
   );
 }
