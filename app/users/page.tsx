@@ -1,5 +1,6 @@
 "use client";
 
+import DefaultLayout from "@/components/Layout/DefaultLayout";
 import { useEffect, useState } from "react";
 
 type User = {
@@ -80,6 +81,7 @@ export default function UsersPage() {
   }
 
   return (
+    <DefaultLayout>
     <section className="space-y-5">
       <div className="rounded-2xl border border-slate-200 bg-white/80 p-6 shadow-sm">
         <h1 className="text-2xl font-bold text-slate-900">CRUD Users</h1>
@@ -156,5 +158,6 @@ export default function UsersPage() {
         </ul>
       </div>
     </section>
+    </DefaultLayout>
   );
 }
