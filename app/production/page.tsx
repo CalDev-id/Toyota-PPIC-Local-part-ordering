@@ -1,4 +1,6 @@
 import DefaultLayout from "@/components/Layout/DefaultLayout";
+import ItemsPage from "../../components/items/page";
+import StatsPage from "../../components/items/stats/page";
 
 export default function ProductionPage() {
   return (
@@ -8,6 +10,8 @@ export default function ProductionPage() {
         <h1 className="mt-2 text-2xl font-bold text-slate-900">Production Overview</h1>
         <p className="mt-2 text-sm text-slate-600">Halaman production siap kamu isi dengan KPI, output line, dan trend.</p>
       </section>
+      {/* <StatsPage/> */}
+      <ItemsPage/>
     </DefaultLayout>
   );
 }
