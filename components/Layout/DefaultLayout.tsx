@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { signOut, useSession } from "next-auth/react";
+import { useEffect, useRef, useState } from "react";
 import Sidebar from "../Sidebar/Sidebar";
 
 type DefaultLayoutProps = {
@@ -10,6 +11,30 @@ type DefaultLayoutProps = {
 export default function DefaultLayout({ children }: DefaultLayoutProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
+  const profileRef = useRef<HTMLDivElement | null>(null);
+  const { data: session } = useSession();
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (!profileRef.current?.contains(event.target as Node)) {
+        setProfileOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside);
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
+  async function handleLogout() {
+    setLoggingOut(true);
+    setProfileOpen(false);
+    await signOut({ callbackUrl: "/login" });
+  }
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,_#dbeafe_0%,_#eff6ff_35%,_#f8fafc_100%)]">
@@ -39,7 +64,49 @@ export default function DefaultLayout({ children }: DefaultLayoutProps) {
                 <p className="text-xs text-slate-500">Layout with collapsible sidebar</p>
               </div>
             </div>
-            <div className="rounded-full bg-slate-900 px-3 py-1 text-xs font-medium text-white">Live</div>
+            <div className="relative" ref={profileRef}>
+              <button
+                type="button"
+                onClick={() => setProfileOpen((prev) => !prev)}
+                className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-300 bg-white text-slate-500 shadow-sm transition hover:border-emerald-500 hover:text-emerald-600"
+                aria-label="Open profile card"
+              >
+                <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8">
+                  <circle cx="12" cy="8" r="3.5" />
+                  <path d="M5.5 20a6.5 6.5 0 0 1 13 0" />
+                </svg>
+              </button>
+
+              {profileOpen && (
+                <div className="absolute right-0 top-14 w-72 rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_18px_50px_rgba(15,23,42,0.14)]">
+                  <div className="flex flex-col items-center text-center">
+                    <div className="flex h-16 w-16 items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-slate-500">
+                      <svg viewBox="0 0 24 24" className="h-8 w-8" fill="none" stroke="currentColor" strokeWidth="1.8">
+                        <circle cx="12" cy="8" r="3.5" />
+                        <path d="M5.5 20a6.5 6.5 0 0 1 13 0" />
+                      </svg>
+                    </div>
+                    <p className="mt-4 text-lg font-semibold text-slate-900">
+                      {session?.user?.name || "Unknown User"}
+                    </p>
+                    <p className="mt-1 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+                      {session?.user?.role || "-"}
+                    </p>
+                    <p className="mt-3 break-all text-sm text-slate-600">
+                      {session?.user?.email || "No email"}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={handleLogout}
+                      disabled={loggingOut}
+                      className="mt-4 inline-flex h-10 w-full items-center justify-center rounded-xl border border-rose-200 bg-rose-50 px-4 text-sm font-semibold text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {loggingOut ? "Logging out..." : "Logout"}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </header>
 

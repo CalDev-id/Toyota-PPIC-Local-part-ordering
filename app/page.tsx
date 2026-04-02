@@ -1,7 +1,10 @@
 import DefaultLayout from "@/components/Layout/DefaultLayout";
+import { requireSession } from "@/lib/session";
 import Link from "next/link";
 
-export default function Home() {
+export default async function Home() {
+  const session = await requireSession()
+
   return (
     <DefaultLayout>
       <section className="space-y-6">
@@ -13,8 +16,7 @@ export default function Home() {
             Welcome to Toyota Dashboard
           </h1>
           <p className="mt-3 max-w-2xl text-sm text-slate-600">
-            Sidebar di kiri sudah aktif dengan menu Home, Production, Analysis,
-            dan Profile.
+            Login aktif untuk semua halaman utama. Saat ini kamu masuk sebagai {session.user.name || session.user.email}.
           </p>
           <Link
             href="/users"

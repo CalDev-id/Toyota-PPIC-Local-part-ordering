@@ -1,5 +1,7 @@
 "use client";
 
+import type { AppRole } from "@/lib/roles";
+import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -14,6 +16,7 @@ type MenuItem = {
   label: string;
   href: string;
   icon: React.ReactNode;
+  roles?: AppRole[];
 };
 
 const menuItems: MenuItem[] = [
@@ -81,12 +84,56 @@ const menuItems: MenuItem[] = [
     ),
   },
   {
-    label: "Profile",
-    href: "/profile",
+    label: "Ordering",
+    href: "/ordering",
+    roles: ["ADMIN", "ORDERING"],
     icon: (
       <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8">
-        <circle cx="12" cy="8" r="3.5" />
-        <path d="M5.5 20a6.5 6.5 0 0 1 13 0" />
+        <path d="M4 7.5h16" />
+        <path d="M7 4.5v6" />
+        <path d="M17 4.5v6" />
+        <rect x="4" y="6" width="16" height="14" rx="2" />
+        <path d="M8 12h8M8 16h5" />
+      </svg>
+    ),
+  },
+  {
+    label: "Receiving",
+    href: "/receiving",
+    roles: ["ADMIN", "RECEIVING"],
+    icon: (
+      <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8">
+        <path d="M4 7h11v10H4z" />
+        <path d="M15 10h2.5l2.5 2.5V17h-5" />
+        <path d="M7 17h5" />
+        <circle cx="8" cy="17" r="1.5" />
+        <circle cx="17" cy="17" r="1.5" />
+      </svg>
+    ),
+  },
+  {
+    label: "Delivery",
+    href: "/delivery",
+    roles: ["ADMIN", "DELIVERY"],
+    icon: (
+      <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8">
+        <path d="M3 7h10v10H3z" />
+        <path d="M13 10h3l3 3v4h-6" />
+        <circle cx="8" cy="17" r="1.5" />
+        <circle cx="17" cy="17" r="1.5" />
+      </svg>
+    ),
+  },
+  {
+    label: "Users",
+    href: "/users",
+    roles: ["ADMIN"],
+    icon: (
+      <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8">
+        <path d="M16 19a4 4 0 0 0-8 0" />
+        <circle cx="12" cy="9" r="3" />
+        <path d="M19 19a3 3 0 0 0-2.2-2.88" />
+        <path d="M17 7.5a2.5 2.5 0 0 1 0 5" />
       </svg>
     ),
   },
@@ -99,6 +146,9 @@ export default function Sidebar({
   onCloseMobile,
 }: SidebarProps) {
   const pathname = usePathname();
+  const { data: session } = useSession();
+  const userRole = session?.user?.role as AppRole | undefined;
+  const visibleMenuItems = menuItems.filter((item) => !item.roles || (userRole && item.roles.includes(userRole)));
 
   return (
     <>
@@ -149,7 +199,7 @@ export default function Sidebar({
 
           {/* MENU ITEMS */}
           <nav className="flex-1 space-y-2 p-3">
-            {menuItems.map((item) => {
+            {visibleMenuItems.map((item) => {
               const isActive = pathname === item.href;
               return (
                 <Link

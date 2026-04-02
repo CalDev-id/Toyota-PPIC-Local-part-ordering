@@ -10,8 +10,11 @@
     "db:init": "tsx scripts/run-migrations.ts"
   },
   "dependencies": {
+    "@auth/prisma-adapter": "^2.11.1",
     "@prisma/client": "^6.19.2",
+    "bcrypt": "^6.0.0",
     "next": "16.1.6",
+    "next-auth": "^4.24.13",
     "pg": "^8.20.0",
     "prisma": "^6.19.2",
     "react": "19.2.3",

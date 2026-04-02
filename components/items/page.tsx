@@ -1,8 +1,8 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
-type ItemRow = {
+export type ItemRow = {
   id: number
   name: string
   qty: number
@@ -12,20 +12,44 @@ type ItemRow = {
 
 type CellField = 'name' | 'qty' | 'status' | 'price'
 
-export default function ItemsPage() {
-  const [rows, setRows] = useState<ItemRow[]>([])
-  const [loading, setLoading] = useState(true)
+type ItemsPageProps = {
+  rows?: ItemRow[]
+  loading?: boolean
+  onRowsChange?: (rows: ItemRow[] | ((prev: ItemRow[]) => ItemRow[])) => void
+  onRefresh?: () => Promise<void>
+}
+
+export default function ItemsPage({
+  rows: externalRows,
+  loading: externalLoading,
+  onRowsChange,
+  onRefresh
+}: ItemsPageProps = {}) {
+  const [internalRows, setInternalRows] = useState<ItemRow[]>([])
+  const [internalLoading, setInternalLoading] = useState(true)
   const [savingMap, setSavingMap] = useState<Record<string, boolean>>({})
   const [errorMap, setErrorMap] = useState<Record<string, boolean>>({})
   const debounceTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
+  const rows = externalRows ?? internalRows
+  const loading = externalLoading ?? internalLoading
 
-  useEffect(() => {
-    fetchRows()
-  }, [])
+  const setRows = useCallback((next: ItemRow[] | ((prev: ItemRow[]) => ItemRow[])) => {
+    if (onRowsChange) {
+      onRowsChange(next)
+      return
+    }
 
-  async function fetchRows() {
+    setInternalRows(next)
+  }, [onRowsChange])
+
+  const fetchRows = useCallback(async () => {
+    if (onRefresh) {
+      await onRefresh()
+      return
+    }
+
     try {
-      setLoading(true)
+      setInternalLoading(true)
       const res = await fetch('/api/items', { cache: 'no-store' })
 
       if (!res.ok) {
@@ -38,9 +62,15 @@ export default function ItemsPage() {
       console.error(error)
       alert('Gagal ambil data')
     } finally {
-      setLoading(false)
+      setInternalLoading(false)
     }
-  }
+  }, [onRefresh, setRows])
+
+  useEffect(() => {
+    if (!onRowsChange) {
+      void fetchRows()
+    }
+  }, [fetchRows, onRowsChange])
 
   function updateLocalCell(id: number, field: CellField, value: string) {
     setRows((prev) =>

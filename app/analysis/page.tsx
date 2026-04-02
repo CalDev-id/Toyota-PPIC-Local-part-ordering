@@ -2,8 +2,11 @@ import DefaultLayout from "@/components/Layout/DefaultLayout";
 import BarComparisonChart from "@/components/charts/BarComparisonChart";
 import DonutQualityChart from "@/components/charts/DonutQualityChart";
 import LineTrendChart from "@/components/charts/LineTrendChart";
+import { requireSession } from "@/lib/session";
 
-export default function AnalysisPage() {
+export default async function AnalysisPage() {
+  await requireSession()
+
   const weeklyOutput = [98, 102, 95, 110, 116, 109];
   const productionByLine = [
     { label: "Line A", value: 128 },
