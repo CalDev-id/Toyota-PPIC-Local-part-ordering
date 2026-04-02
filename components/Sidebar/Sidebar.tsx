@@ -4,6 +4,7 @@ import type { AppRole } from "@/lib/roles";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useSyncExternalStore } from "react";
 
 type SidebarProps = {
   collapsed: boolean;
@@ -145,10 +146,14 @@ export default function Sidebar({
   onToggleCollapse,
   onCloseMobile,
 }: SidebarProps) {
+  const mounted = useMounted();
   const pathname = usePathname();
   const { data: session } = useSession();
-  const userRole = session?.user?.role as AppRole | undefined;
-  const visibleMenuItems = menuItems.filter((item) => !item.roles || (userRole && item.roles.includes(userRole)));
+
+  const userRole = mounted ? (session?.user?.role as AppRole | undefined) : undefined;
+  const visibleMenuItems = menuItems.filter(
+    (item) => !item.roles || (userRole && item.roles.includes(userRole))
+  );
 
   return (
     <>
@@ -237,4 +242,20 @@ export default function Sidebar({
       )}
     </>
   );
+}
+
+function useMounted() {
+  return useSyncExternalStore(subscribeToMount, getClientSnapshot, getServerSnapshot);
+}
+
+function subscribeToMount() {
+  return () => {};
+}
+
+function getClientSnapshot() {
+  return true;
+}
+
+function getServerSnapshot() {
+  return false;
 }

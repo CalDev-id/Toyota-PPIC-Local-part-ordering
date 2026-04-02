@@ -1,7 +1,7 @@
 "use client";
 
 import { signOut, useSession } from "next-auth/react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import Sidebar from "../Sidebar/Sidebar";
 
 type DefaultLayoutProps = {
@@ -15,6 +15,7 @@ export default function DefaultLayout({ children }: DefaultLayoutProps) {
   const [loggingOut, setLoggingOut] = useState(false);
   const profileRef = useRef<HTMLDivElement | null>(null);
   const { data: session } = useSession();
+  const mounted = useMounted();
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -29,6 +30,10 @@ export default function DefaultLayout({ children }: DefaultLayoutProps) {
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, []);
+
+  const profileName = mounted ? session?.user?.name || "Unknown User" : "Unknown User";
+  const profileRole = mounted ? session?.user?.role || "-" : "-";
+  const profileEmail = mounted ? session?.user?.email || "No email" : "No email";
 
   async function handleLogout() {
     setLoggingOut(true);
@@ -87,13 +92,13 @@ export default function DefaultLayout({ children }: DefaultLayoutProps) {
                       </svg>
                     </div>
                     <p className="mt-4 text-lg font-semibold text-slate-900">
-                      {session?.user?.name || "Unknown User"}
+                      {profileName}
                     </p>
                     <p className="mt-1 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
-                      {session?.user?.role || "-"}
+                      {profileRole}
                     </p>
                     <p className="mt-3 break-all text-sm text-slate-600">
-                      {session?.user?.email || "No email"}
+                      {profileEmail}
                     </p>
                     <button
                       type="button"
@@ -114,4 +119,20 @@ export default function DefaultLayout({ children }: DefaultLayoutProps) {
       </div>
     </div>
   );
+}
+
+function useMounted() {
+  return useSyncExternalStore(subscribeToMount, getClientSnapshot, getServerSnapshot);
+}
+
+function subscribeToMount() {
+  return () => {};
+}
+
+function getClientSnapshot() {
+  return true;
+}
+
+function getServerSnapshot() {
+  return false;
 }
