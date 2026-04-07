@@ -1,9 +1,9 @@
 import DefaultLayout from "@/components/Layout/DefaultLayout"
 import UsersPageClient from "@/components/users/UsersPageClient"
-import { requireSession } from "@/lib/session"
+import { requireRole } from "@/lib/session"
 
 export default async function UsersPage() {
-  await requireSession()
+  await requireRole(["ADMIN"])
 
   return (
     <DefaultLayout>

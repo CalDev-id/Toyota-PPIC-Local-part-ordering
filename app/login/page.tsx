@@ -19,7 +19,7 @@ export default async function LoginPage() {
             Production dashboard access for internal teams.
           </h1>
           <p className="mt-4 max-w-lg text-sm leading-6 text-slate-300">
-            Login untuk mengakses halaman home, production, analysis, profile, dan user management.
+            Login untuk mengakses halaman home, analysis, profile, dan user management.
           </p>
 
           <div className="mt-10 grid gap-4">

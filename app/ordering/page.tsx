@@ -2,29 +2,46 @@ import DefaultLayout from "@/components/Layout/DefaultLayout";
 import OrderingReportShell from "@/components/ordering/OrderingReportShell";
 import {
   buildOrderItemSummaries,
+  getOrderingFilterOptions,
   getOrderReportRows,
-  normalizeMonthFilter,
+  normalizeOrderingFilter,
+  type OrderingFilter,
+  type OrderingFilterOptions,
   type OrderReportRow,
 } from "@/lib/order-report";
-import { requireSession } from "@/lib/session";
+import { requireRole } from "@/lib/session";
 
 type OrderingPageProps = {
   searchParams?: Promise<{
-    month?: string;
+    date?: string;
+    shift?: string;
+    dayNight?: string;
+    success?: string;
   }>;
 };
 
 export default async function OrderingPage({ searchParams }: OrderingPageProps) {
-  await requireSession();
+  await requireRole(["ADMIN", "ORDERING"]);
 
   const resolvedSearchParams = searchParams ? await searchParams : undefined;
-  const selectedMonth = normalizeMonthFilter(resolvedSearchParams?.month);
+  const selectedFilter = await normalizeOrderingFilter({
+    date: resolvedSearchParams?.date,
+    shift: resolvedSearchParams?.shift,
+    dayNight: resolvedSearchParams?.dayNight,
+  });
 
   let rows: OrderReportRow[] = [];
+  let filterOptions: OrderingFilterOptions = { dates: [], shifts: [], dayNights: [] };
+  const activeFilter: OrderingFilter = selectedFilter;
   let errorMessage: string | null = null;
 
   try {
-    rows = await getOrderReportRows(selectedMonth);
+    const [reportRows, options] = await Promise.all([
+      getOrderReportRows(selectedFilter),
+      getOrderingFilterOptions(),
+    ]);
+    rows = reportRows;
+    filterOptions = options;
   } catch (error) {
     console.error("Failed to load ordering report", error);
     errorMessage =
@@ -33,16 +50,18 @@ export default async function OrderingPage({ searchParams }: OrderingPageProps) 
         : "Data report belum bisa dimuat.";
   }
 
-  const summaries = buildOrderItemSummaries(rows);
+  const summaries = await buildOrderItemSummaries(rows, activeFilter);
 
   return (
     <DefaultLayout>
-      <div key={selectedMonth}>
+      <div key={`${activeFilter.date}-${activeFilter.shift}-${activeFilter.dayNight}`}>
         <OrderingReportShell
           rows={rows}
           summaries={summaries}
-          selectedMonth={selectedMonth}
+          selectedFilter={activeFilter}
+          filterOptions={filterOptions}
           errorMessage={errorMessage}
+          successMessage={resolvedSearchParams?.success}
         />
       </div>
     </DefaultLayout>

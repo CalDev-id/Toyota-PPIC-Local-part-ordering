@@ -1,28 +1,5 @@
 import { prisma } from "@/lib/prisma";
 
-type TableReference = {
-  table_schema: string;
-  table_name: string;
-};
-
-type OrderReportRowQuery = {
-  Tanggal_ORD: string | Date | null;
-  Waktu: string | null;
-  Kode_Input: string | null;
-  CB_1TR: unknown;
-  Konf_CB_1TR: unknown;
-  CB_2TR: unknown;
-  Konf_CB_2TR: unknown;
-  Cam_No_01: unknown;
-  Konf_Cam_01: unknown;
-  Cam_No_02: unknown;
-  Konf_Cam_02: unknown;
-  CR_1TR: unknown;
-  Konf_CR_1TR: unknown;
-  Remarks_Junbiki_S2: string | null;
-  Remarks_Pallet_S2: string | null;
-};
-
 export type OrderMetricKey =
   | "cb1tr"
   | "cb2tr"
@@ -36,10 +13,15 @@ export type OrderMetricPair = {
 };
 
 export type OrderReportRow = {
+  orderId: string;
   rawDate: string;
   date: string;
   time: string;
   code: string;
+  shift: string;
+  dayNight: string;
+  truckType: string;
+  statusOrder: string;
   cb1tr: OrderMetricPair;
   cb2tr: OrderMetricPair;
   camNo01: OrderMetricPair;
@@ -53,104 +35,229 @@ export type OrderReportRow = {
 export type OrderItemSummary = {
   key: OrderMetricKey;
   label: string;
+  totalStock: number;
+  planProduksi: number;
   orderTotal: number;
   deliveryTotal: number;
   gap: number;
 };
 
-export async function getOrderReportRows(selectedMonth: string): Promise<OrderReportRow[]> {
-  const tableRef = await resolveOrderRecordTable();
-  const qualifiedTableName = `${quoteIdentifier(tableRef.table_schema)}.${quoteIdentifier(
-    tableRef.table_name
-  )}`;
-  const monthRange = getMonthRange(selectedMonth);
+export type OrderingFilter = {
+  date: string;
+  shift: string;
+  dayNight: string;
+};
 
-  const rows = await prisma.$queryRawUnsafe<OrderReportRowQuery[]>(
-    `
-    SELECT
-      "Tanggal_ORD",
-      "Waktu",
-      "Kode_Input",
-      "CB_1TR",
-      "Konf_CB_1TR",
-      "CB_2TR",
-      "Konf_CB_2TR",
-      "Cam_No_01",
-      "Konf_Cam_01",
-      "Cam_No_02",
-      "Konf_Cam_02",
-      "CR_1TR",
-      "Konf_CR_1TR",
-      "Remarks_Junbiki_S2",
-      "Remarks_Pallet_S2"
-    FROM ${qualifiedTableName}
-    WHERE "Kode_Input" LIKE 'ORD-%'
-      AND TO_DATE("Tanggal_ORD", 'DD/MM/YYYY') >= $1::date
-      AND TO_DATE("Tanggal_ORD", 'DD/MM/YYYY') < $2::date
-    ORDER BY
-      TO_DATE("Tanggal_ORD", 'DD/MM/YYYY') DESC,
-      "Waktu" DESC,
-      "Kode_Input" DESC
-  `,
-    monthRange.startDate,
-    monthRange.endDate
-  );
+export type OrderingFilterOptions = {
+  dates: string[];
+  shifts: string[];
+  dayNights: string[];
+};
 
-  return rows.map((row) => {
-    const sortDate = parseDateValue(row.Tanggal_ORD);
+type MetricConfig = {
+  key: OrderMetricKey;
+  label: string;
+  itemCode: string;
+  getPlanningStock: (metrics: DailyPlanningMetrics) => number;
+  planningProdField: keyof DailyPlanningMetrics;
+};
+
+type DailyPlanningMetrics = {
+  stockAwalJunbikiCb1tr: number;
+  stockAwalJunbikiCb2tr: number;
+  stockAwalEmergencyCb1tr: number;
+  stockAwalEmergencyCb2tr: number;
+  stockAwalEmergencyCr1tr: number;
+  stockAwalEmergencyCam01: number;
+  stockAwalEmergencyCam02: number;
+  planProdCb1tr: number;
+  planProdCb2tr: number;
+  planProdCr1tr: number;
+  planProdCam01: number;
+  planProdCam02: number;
+};
+
+const METRIC_CONFIGS: MetricConfig[] = [
+  {
+    key: "cb1tr",
+    label: "CB_1TR",
+    itemCode: "CB_1TR",
+    getPlanningStock: (metrics) => metrics.stockAwalJunbikiCb1tr + metrics.stockAwalEmergencyCb1tr,
+    planningProdField: "planProdCb1tr",
+  },
+  {
+    key: "cb2tr",
+    label: "CB_2TR",
+    itemCode: "CB_2TR",
+    getPlanningStock: (metrics) => metrics.stockAwalJunbikiCb2tr + metrics.stockAwalEmergencyCb2tr,
+    planningProdField: "planProdCb2tr",
+  },
+  {
+    key: "camNo01",
+    label: "Cam_No_01",
+    itemCode: "CAM_01",
+    getPlanningStock: (metrics) => metrics.stockAwalEmergencyCam01,
+    planningProdField: "planProdCam01",
+  },
+  {
+    key: "camNo02",
+    label: "Cam_No_02",
+    itemCode: "CAM_02",
+    getPlanningStock: (metrics) => metrics.stockAwalEmergencyCam02,
+    planningProdField: "planProdCam02",
+  },
+  {
+    key: "cr1tr",
+    label: "CR_1TR",
+    itemCode: "CR_1TR",
+    getPlanningStock: (metrics) => metrics.stockAwalEmergencyCr1tr,
+    planningProdField: "planProdCr1tr",
+  },
+];
+
+export async function getOrderingFilterOptions(): Promise<OrderingFilterOptions> {
+  const [planningRows, orderRows] = await Promise.all([
+    prisma.dailyPlanning.findMany({
+      select: { tanggal: true, shift: true, dayNight: true },
+      orderBy: [{ tanggal: "desc" }, { shift: "asc" }, { dayNight: "asc" }],
+    }),
+    prisma.orderHeader.findMany({
+      where: { kodeOrder: { startsWith: "ORD-" } },
+      select: { tanggalOrder: true, shift: true, dayNight: true },
+      orderBy: [{ tanggalOrder: "desc" }, { shift: "asc" }, { dayNight: "asc" }],
+    }),
+  ]);
+
+  const dates = new Set<string>();
+  const shifts = new Set<string>();
+  const dayNights = new Set<string>();
+
+  for (const row of planningRows) {
+    dates.add(formatDateInput(row.tanggal));
+    shifts.add(normalizeShift(row.shift));
+    dayNights.add(normalizeDayNight(row.dayNight));
+  }
+
+  for (const row of orderRows) {
+    dates.add(formatDateInput(row.tanggalOrder));
+    shifts.add(normalizeShift(row.shift));
+    dayNights.add(normalizeDayNight(row.dayNight));
+  }
+
+  return {
+    dates: Array.from(dates).sort((a, b) => b.localeCompare(a)),
+    shifts: sortSimple(Array.from(shifts).filter(Boolean)),
+    dayNights: sortSimple(Array.from(dayNights).filter(Boolean)),
+  };
+}
+
+export async function normalizeOrderingFilter(
+  input: Partial<OrderingFilter> | undefined
+): Promise<OrderingFilter> {
+  const options = await getOrderingFilterOptions();
+  const latestFallback = await getLatestOrderingFilterFallback();
+
+  const date =
+    input?.date && options.dates.includes(input.date)
+      ? input.date
+      : latestFallback.date || options.dates[0] || formatDateInput(new Date());
+
+  const shiftCandidate = normalizeShift(input?.shift);
+  const shift =
+    shiftCandidate && options.shifts.includes(shiftCandidate)
+      ? shiftCandidate
+      : latestFallback.shift || options.shifts[0] || "";
+
+  const dayNightCandidate = normalizeDayNight(input?.dayNight);
+  const dayNight = options.dayNights.includes(dayNightCandidate)
+    ? dayNightCandidate
+    : latestFallback.dayNight || options.dayNights[0] || "";
+
+  return { date, shift, dayNight };
+}
+
+export async function getOrderReportRows(filter: OrderingFilter): Promise<OrderReportRow[]> {
+  const headers = await prisma.orderHeader.findMany({
+    where: {
+      kodeOrder: { startsWith: "ORD-" },
+      tanggalOrder: new Date(`${filter.date}T00:00:00.000Z`),
+      shift: filter.shift,
+      dayNight: nullableFilterValue(filter.dayNight),
+    },
+    include: {
+      details: {
+        orderBy: { lineNo: "asc" },
+      },
+    },
+    orderBy: [{ waktuOrder: "desc" }, { kodeOrder: "desc" }],
+  });
+
+  return headers.map((header) => {
+    const metrics = createEmptyMetricMap();
+
+    for (const detail of header.details) {
+      const metric = METRIC_CONFIGS.find((item) => item.itemCode === detail.itemCode);
+      if (!metric) {
+        continue;
+      }
+
+      metrics[metric.key] = {
+        order: detail.qtyOrder,
+        delivery: detail.qtyConfirm ?? 0,
+      };
+    }
 
     return {
-      rawDate: normalizeRawDate(row.Tanggal_ORD),
-      date: formatDateLabel(row.Tanggal_ORD),
-      time: normalizeText(row.Waktu),
-      code: normalizeText(row.Kode_Input),
-      cb1tr: {
-        order: toNumber(row.CB_1TR),
-        delivery: toNumber(row.Konf_CB_1TR),
-      },
-      cb2tr: {
-        order: toNumber(row.CB_2TR),
-        delivery: toNumber(row.Konf_CB_2TR),
-      },
-      camNo01: {
-        order: toNumber(row.Cam_No_01),
-        delivery: toNumber(row.Konf_Cam_01),
-      },
-      camNo02: {
-        order: toNumber(row.Cam_No_02),
-        delivery: toNumber(row.Konf_Cam_02),
-      },
-      cr1tr: {
-        order: toNumber(row.CR_1TR),
-        delivery: toNumber(row.Konf_CR_1TR),
-      },
-      remarksJunbikiS2: normalizeText(row.Remarks_Junbiki_S2),
-      remarksPalletS2: normalizeText(row.Remarks_Pallet_S2),
-      sortDateValue: sortDate,
+      orderId: header.orderId,
+      rawDate: formatDateInput(header.tanggalOrder),
+      date: formatDateLabel(header.tanggalOrder),
+      time: formatTimeLabel(header.waktuOrder),
+      code: header.kodeOrder,
+      shift: header.shift,
+      dayNight: normalizeDayNight(header.dayNight),
+      truckType: normalizeText(header.truckType),
+      statusOrder: normalizeText(header.statusOrder),
+      cb1tr: metrics.cb1tr,
+      cb2tr: metrics.cb2tr,
+      camNo01: metrics.camNo01,
+      camNo02: metrics.camNo02,
+      cr1tr: metrics.cr1tr,
+      remarksJunbikiS2: header.truckType === "JUNBIKI" ? normalizeText(header.remarksOrdering) : "-",
+      remarksPalletS2: header.truckType === "PALLET" ? normalizeText(header.remarksOrdering) : "-",
+      sortDateValue: header.waktuOrder.getTime(),
     };
   });
 }
 
-export function normalizeMonthFilter(value: string | undefined): string {
-  if (value && /^\d{4}-\d{2}$/.test(value)) {
-    return value;
-  }
+export async function buildOrderItemSummaries(
+  rows: OrderReportRow[],
+  filter: OrderingFilter
+): Promise<OrderItemSummary[]> {
+  const planning = await prisma.dailyPlanning.findFirst({
+    where: {
+      tanggal: new Date(`${filter.date}T00:00:00.000Z`),
+      shift: filter.shift,
+      dayNight: nullableFilterValue(filter.dayNight),
+    },
+  });
 
-  const now = new Date();
-  const month = String(now.getMonth() + 1).padStart(2, "0");
-  return `${now.getFullYear()}-${month}`;
-}
+  const planningMetrics: DailyPlanningMetrics = {
+    stockAwalJunbikiCb1tr: planning?.stockAwalJunbikiCb1tr ?? 0,
+    stockAwalJunbikiCb2tr: planning?.stockAwalJunbikiCb2tr ?? 0,
+    stockAwalEmergencyCb1tr: planning?.stockAwalEmergencyCb1tr ?? 0,
+    stockAwalEmergencyCb2tr: planning?.stockAwalEmergencyCb2tr ?? 0,
+    stockAwalEmergencyCr1tr: planning?.stockAwalEmergencyCr1tr ?? 0,
+    stockAwalEmergencyCam01: planning?.stockAwalEmergencyCam01 ?? 0,
+    stockAwalEmergencyCam02: planning?.stockAwalEmergencyCam02 ?? 0,
+    planProdCb1tr: planning?.planProdCb1tr ?? 0,
+    planProdCb2tr: planning?.planProdCb2tr ?? 0,
+    planProdCr1tr: planning?.planProdCr1tr ?? 0,
+    planProdCam01: planning?.planProdCam01 ?? 0,
+    planProdCam02: planning?.planProdCam02 ?? 0,
+  };
 
-export function buildOrderItemSummaries(rows: OrderReportRow[]): OrderItemSummary[] {
-  const configs: Array<{ key: OrderMetricKey; label: string }> = [
-    { key: "cb1tr", label: "CB_1TR" },
-    { key: "cb2tr", label: "CB_2TR" },
-    { key: "camNo01", label: "Cam_No_01" },
-    { key: "camNo02", label: "Cam_No_02" },
-    { key: "cr1tr", label: "CR_1TR" },
-  ];
-
-  return configs.map(({ key, label }) => {
+  return METRIC_CONFIGS.map(({ key, label, getPlanningStock, planningProdField }) => {
+    const stockAwal = getPlanningStock(planningMetrics);
     const totals = rows.reduce(
       (acc, row) => {
         acc.orderTotal += row[key].order;
@@ -163,6 +270,8 @@ export function buildOrderItemSummaries(rows: OrderReportRow[]): OrderItemSummar
     return {
       key,
       label,
+      totalStock: stockAwal + totals.deliveryTotal,
+      planProduksi: planningMetrics[planningProdField],
       orderTotal: totals.orderTotal,
       deliveryTotal: totals.deliveryTotal,
       gap: totals.deliveryTotal - totals.orderTotal,
@@ -170,116 +279,87 @@ export function buildOrderItemSummaries(rows: OrderReportRow[]): OrderItemSummar
   });
 }
 
-async function resolveOrderRecordTable(): Promise<TableReference> {
-  const candidates = await prisma.$queryRawUnsafe<TableReference[]>(`
-    SELECT table_schema, table_name
-    FROM information_schema.tables
-    WHERE table_type = 'BASE TABLE'
-      AND lower(table_name) = lower('Order_Record')
-      AND table_schema NOT IN ('pg_catalog', 'information_schema')
-    ORDER BY
-      CASE WHEN table_schema = 'public' THEN 0 ELSE 1 END,
-      table_schema,
-      table_name
-  `);
+async function getLatestOrderingFilterFallback(): Promise<OrderingFilter> {
+  const latestPlanning = await prisma.dailyPlanning.findFirst({
+    orderBy: [{ tanggal: "desc" }, { shift: "asc" }, { dayNight: "asc" }],
+  });
 
-  const tableRef = candidates[0];
-
-  if (!tableRef) {
-    throw new Error(
-      'Tabel Order_Record tidak ditemukan. Cek nama tabel hasil import di PostgreSQL, kemungkinan tersimpan sebagai "order_record" atau di schema selain public.'
-    );
+  if (latestPlanning) {
+    return {
+      date: formatDateInput(latestPlanning.tanggal),
+      shift: normalizeShift(latestPlanning.shift),
+      dayNight: normalizeDayNight(latestPlanning.dayNight),
+    };
   }
 
-  return tableRef;
-}
+  const latestOrder = await prisma.orderHeader.findFirst({
+    where: { kodeOrder: { startsWith: "ORD-" } },
+    orderBy: [{ tanggalOrder: "desc" }, { waktuOrder: "desc" }],
+  });
 
-function quoteIdentifier(value: string): string {
-  return `"${value.replace(/"/g, "\"\"")}"`;
-}
-
-function getMonthRange(selectedMonth: string) {
-  const normalized = normalizeMonthFilter(selectedMonth);
-  const [year, month] = normalized.split("-").map(Number);
-  const start = new Date(Date.UTC(year, month - 1, 1));
-  const end = new Date(Date.UTC(year, month, 1));
+  if (latestOrder) {
+    return {
+      date: formatDateInput(latestOrder.tanggalOrder),
+      shift: normalizeShift(latestOrder.shift),
+      dayNight: normalizeDayNight(latestOrder.dayNight),
+    };
+  }
 
   return {
-    startDate: formatSqlDate(start),
-    endDate: formatSqlDate(end),
+    date: formatDateInput(new Date()),
+    shift: "",
+    dayNight: "",
   };
 }
 
-function toNumber(value: unknown): number {
-  if (typeof value === "number" && Number.isFinite(value)) {
-    return value;
-  }
-
-  if (typeof value === "string") {
-    const trimmed = value.trim();
-    if (!trimmed) {
-      return 0;
-    }
-
-    const normalized = trimmed.replace(/,/g, "");
-    const parsed = Number(normalized);
-    return Number.isFinite(parsed) ? parsed : 0;
-  }
-
-  return 0;
+function createEmptyMetricMap(): Record<OrderMetricKey, OrderMetricPair> {
+  return {
+    cb1tr: { order: 0, delivery: 0 },
+    cb2tr: { order: 0, delivery: 0 },
+    camNo01: { order: 0, delivery: 0 },
+    camNo02: { order: 0, delivery: 0 },
+    cr1tr: { order: 0, delivery: 0 },
+  };
 }
 
-function normalizeText(value: string | null): string {
+function normalizeText(value: string | null | undefined): string {
   return value?.trim() || "-";
 }
 
-function normalizeRawDate(value: string | Date | null): string {
-  if (value instanceof Date) {
-    return formatSqlDate(value);
-  }
-
-  return value?.trim() || "-";
+function normalizeShift(value: string | null | undefined): string {
+  return value?.trim().toUpperCase() || "";
 }
 
-function parseDateValue(value: string | Date | null): number {
-  if (value instanceof Date) {
-    return value.getTime();
-  }
-
-  if (!value) {
-    return 0;
-  }
-
-  const trimmed = value.trim();
-  if (!trimmed) {
-    return 0;
-  }
-
-  const [day, month, year] = trimmed.split("/").map(Number);
-  if (!day || !month || !year) {
-    return 0;
-  }
-
-  return new Date(year, month - 1, day).getTime();
+function normalizeDayNight(value: string | null | undefined): string {
+  return value?.trim().toUpperCase() || "";
 }
 
-function formatDateLabel(value: string | Date | null): string {
-  const dateValue = parseDateValue(value);
+function nullableFilterValue(value: string) {
+  return value ? value : null;
+}
 
-  if (!dateValue) {
-    return "-";
-  }
+function formatDateInput(value: Date): string {
+  return value.toISOString().slice(0, 10);
+}
 
-  const date = new Date(dateValue);
-  const day = String(date.getDate()).padStart(2, "0");
-  const month = MONTH_NAMES_SHORT[date.getMonth()];
-  const year = date.getFullYear();
+function formatTimeLabel(value: Date): string {
+  return new Intl.DateTimeFormat("id-ID", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: "UTC",
+  }).format(value);
+}
 
+function formatDateLabel(value: Date): string {
+  const day = String(value.getUTCDate()).padStart(2, "0");
+  const month = MONTH_NAMES_SHORT[value.getUTCMonth()];
+  const year = value.getUTCFullYear();
   return `${day} ${month} ${year}`;
 }
 
-function formatSqlDate(value: Date): string {
-  return value.toISOString().slice(0, 10);
+function sortSimple(values: string[]) {
+  return values.sort((a, b) => a.localeCompare(b));
 }
 
 const MONTH_NAMES_SHORT = [

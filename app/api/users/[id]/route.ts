@@ -19,6 +19,10 @@ export async function PUT(req: Request, context: RouteContext) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
+    if (session.user.role !== "ADMIN") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    }
+
     const { id } = await context.params
     const body = await req.json()
     const name = typeof body.name === "string" ? body.name.trim() : ""
@@ -87,6 +91,10 @@ export async function DELETE(_: Request, context: RouteContext) {
 
     if (!session?.user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    if (session.user.role !== "ADMIN") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 
     const { id } = await context.params

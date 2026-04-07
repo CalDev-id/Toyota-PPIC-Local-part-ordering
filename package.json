@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "db:init": "tsx scripts/run-migrations.ts"
+    "db:init": "tsx scripts/run-migrations.ts",
+    "db:import-ordering": "tsx scripts/import-ordering-data.ts"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.1",
