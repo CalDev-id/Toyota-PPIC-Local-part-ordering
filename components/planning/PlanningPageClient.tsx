@@ -1,7 +1,7 @@
 "use client";
 
-import type { FormEvent, ReactNode } from "react";
-import { useEffect, useRef, useState } from "react";
+import type { FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 type PlanningRecord = {
   planId: string;
@@ -72,7 +72,7 @@ export default function PlanningPageClient() {
   const [toast, setToast] = useState<ToastState>(null);
   const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  function showToast(type: "success" | "error", message: string) {
+  const showToast = useCallback((type: "success" | "error", message: string) => {
     if (toastTimeoutRef.current) {
       clearTimeout(toastTimeoutRef.current);
     }
@@ -82,19 +82,9 @@ export default function PlanningPageClient() {
       setToast(null);
       toastTimeoutRef.current = null;
     }, 3200);
-  }
-
-  useEffect(() => {
-    void loadRecords();
-
-    return () => {
-      if (toastTimeoutRef.current) {
-        clearTimeout(toastTimeoutRef.current);
-      }
-    };
   }, []);
 
-  async function loadRecords() {
+  const loadRecords = useCallback(async () => {
     try {
       setLoading(true);
       setError("");
@@ -114,7 +104,17 @@ export default function PlanningPageClient() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [showToast]);
+
+  useEffect(() => {
+    void loadRecords();
+
+    return () => {
+      if (toastTimeoutRef.current) {
+        clearTimeout(toastTimeoutRef.current);
+      }
+    };
+  }, [loadRecords]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -607,37 +607,6 @@ export default function PlanningPageClient() {
   );
 }
 
-function TextField({
-  label,
-  value,
-  onChange,
-  type = "text",
-  readOnly = false,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  type?: string;
-  readOnly?: boolean;
-}) {
-  return (
-    <div>
-      <label className="mb-1 block text-sm font-medium text-slate-700">{label}</label>
-      <input
-        type={type}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        readOnly={readOnly}
-        className={`h-10 w-full rounded-lg border px-3 text-sm outline-none transition ${
-          readOnly
-            ? "border-slate-200 bg-slate-100 text-slate-600"
-            : "border-slate-300 bg-white focus:border-sky-500"
-        }`}
-      />
-    </div>
-  );
-}
-
 function NumberField({
   label,
   value,
@@ -647,26 +616,19 @@ function NumberField({
   value: number;
   onChange: (value: number) => void;
 }) {
-  const [inputValue, setInputValue] = useState(value === 0 ? "" : String(value));
-
-  useEffect(() => {
-    setInputValue(value === 0 ? "" : String(value));
-  }, [value]);
-
   return (
     <div>
       <label className="mb-1 block text-sm font-medium text-slate-700">{label}</label>
       <input
         type="text"
         inputMode="numeric"
-        value={inputValue}
+        value={value === 0 ? "" : String(value)}
         onChange={(event) => {
           const numeric = event.target.value.replace(/[^\d]/g, "");
-          setInputValue(numeric);
           onChange(Number(numeric || 0));
         }}
         onBlur={() => {
-          if (!inputValue) {
+          if (value === 0) {
             onChange(0);
           }
         }}

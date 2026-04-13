@@ -1,6 +1,7 @@
 "use client";
 
 import type { NotificationStreamItem } from "@/lib/notification-events";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 type NotificationState = {
@@ -20,6 +21,7 @@ const emptyState: NotificationState = {
 };
 
 export default function NotificationCenter({ enabled }: NotificationCenterProps) {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -76,12 +78,31 @@ export default function NotificationCenter({ enabled }: NotificationCenterProps)
 
     void loadNotifications(true);
 
+    function syncIfVisible(showLoading = false) {
+      if (document.visibilityState === "visible") {
+        void loadNotifications(showLoading);
+      }
+    }
+
+    function handleVisibilityChange() {
+      syncIfVisible(false);
+    }
+
+    function handleFocus() {
+      syncIfVisible(false);
+    }
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("focus", handleFocus);
+
     pollingRef.current = setInterval(() => {
-      void loadNotifications(false);
-    }, 5000);
+      syncIfVisible(false);
+    }, 30000);
 
     return () => {
       cancelled = true;
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("focus", handleFocus);
       if (pollingRef.current) {
         clearInterval(pollingRef.current);
         pollingRef.current = null;
@@ -116,8 +137,9 @@ export default function NotificationCenter({ enabled }: NotificationCenterProps)
 
   const hasNotifications = state.history.length > 0;
   const activeItems = useMemo(() => state.active.slice(0, 5), [state.active]);
+  const historyGroups = useMemo(() => groupNotificationsByRelativeDay(state.history), [state.history]);
 
-  async function handleDismiss(recipientId: string) {
+  async function handleDismiss(recipientId: string, shouldRefresh = false) {
     const previousState = state;
     setState((current) => dismissNotificationLocally(current, recipientId));
 
@@ -132,6 +154,9 @@ export default function NotificationCenter({ enabled }: NotificationCenterProps)
       }
 
       setState((current) => applyIncomingNotification(current, data.item));
+      if (shouldRefresh) {
+        router.refresh();
+      }
     } catch (dismissError) {
       setState(previousState);
       setError(dismissError instanceof Error ? dismissError.message : "Gagal dismiss notifikasi");
@@ -172,7 +197,7 @@ export default function NotificationCenter({ enabled }: NotificationCenterProps)
                 </div>
                 <button
                   type="button"
-                  onClick={() => handleDismiss(item.recipientId)}
+                  onClick={() => handleDismiss(item.recipientId, true)}
                   className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
                   aria-label={`Dismiss ${item.kodeOrder}`}
                 >
@@ -206,32 +231,39 @@ export default function NotificationCenter({ enabled }: NotificationCenterProps)
 
           {!loading && hasNotifications ? (
             <div className="mt-4 max-h-[26rem] space-y-3 overflow-y-auto pr-1">
-              {state.history.map((item) => (
-                <div
-                  key={item.recipientId}
-                  className={`rounded-2xl border px-4 py-3 ${
-                    item.isRead
-                      ? "border-slate-200 bg-slate-50"
-                      : "border-sky-200 bg-sky-50/70"
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold text-slate-900">{item.message}</p>
-                      <p className="mt-1 text-xs text-slate-500">{formatNotificationTime(item.createdAt)}</p>
-                    </div>
-                    <span
-                      className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] ${
-                        item.dismissedAt
-                          ? "bg-slate-200 text-slate-600"
-                          : item.isRead
-                            ? "bg-emerald-100 text-emerald-700"
-                            : "bg-sky-100 text-sky-700"
+              {historyGroups.map((group) => (
+                <div key={group.label} className="space-y-3">
+                  <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">
+                    {group.label}
+                  </p>
+                  {group.items.map((item) => (
+                    <div
+                      key={item.recipientId}
+                      className={`rounded-2xl border px-4 py-3 ${
+                        item.isRead
+                          ? "border-slate-200 bg-slate-50"
+                          : "border-sky-200 bg-sky-50/70"
                       }`}
                     >
-                      {item.dismissedAt ? "dismissed" : item.isRead ? "read" : "new"}
-                    </span>
-                  </div>
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-slate-900">{item.message}</p>
+                          <p className="mt-1 text-xs text-slate-500">{formatNotificationTime(item.createdAt)}</p>
+                        </div>
+                        <span
+                          className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] ${
+                            item.dismissedAt
+                              ? "bg-slate-200 text-slate-600"
+                              : item.isRead
+                                ? "bg-emerald-100 text-emerald-700"
+                                : "bg-sky-100 text-sky-700"
+                          }`}
+                        >
+                          {item.dismissedAt ? "dismissed" : item.isRead ? "read" : "new"}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               ))}
             </div>
@@ -299,5 +331,38 @@ function getNotificationLabel(type: NotificationStreamItem["type"]) {
     return "Order Baru";
   }
 
-  return "Delivery Confirmed";
+  if (type === "DELIVERY_CONFIRMED") {
+    return "Delivery Confirmed";
+  }
+
+  return "Receiving Checked";
+}
+
+function groupNotificationsByRelativeDay(items: NotificationStreamItem[]) {
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+
+  const yesterdayStart = new Date(todayStart);
+  yesterdayStart.setDate(yesterdayStart.getDate() - 1);
+
+  const todayItems: NotificationStreamItem[] = [];
+  const yesterdayItems: NotificationStreamItem[] = [];
+
+  for (const item of items) {
+    const createdAt = new Date(item.createdAt);
+
+    if (createdAt >= todayStart) {
+      todayItems.push(item);
+      continue;
+    }
+
+    if (createdAt >= yesterdayStart) {
+      yesterdayItems.push(item);
+    }
+  }
+
+  return [
+    { label: "Today", items: todayItems },
+    { label: "Yesterday", items: yesterdayItems },
+  ].filter((group) => group.items.length > 0);
 }

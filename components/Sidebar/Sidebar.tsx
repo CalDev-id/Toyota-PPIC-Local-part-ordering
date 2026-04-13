@@ -107,7 +107,18 @@ const menuItems: MenuItem[] = [
       </svg>
     ),
   },
-
+  {
+    label: "Tracking",
+    href: "/tracking",
+    icon: (
+      <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8">
+        <path d="M3 7h10v8H3z" />
+        <path d="M13 10h3l3 3v2h-6" />
+        <circle cx="8" cy="17" r="1.5" />
+        <circle cx="17" cy="17" r="1.5" />
+      </svg>
+    ),
+  },
   {
     label: "Users",
     href: "/users",

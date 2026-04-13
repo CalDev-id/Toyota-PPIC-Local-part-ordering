@@ -9,22 +9,23 @@ import {
   type ResolvedOrderingContext,
 } from "@/lib/order-report";
 
-export type DeliveryMetricKey =
+export type ReceivingMetricKey =
   | "cb1tr"
   | "cb2tr"
   | "camNo01"
   | "camNo02"
   | "cr1tr";
 
-export type DeliverySummary = {
-  key: DeliveryMetricKey;
+export type ReceivingSummary = {
+  key: ReceivingMetricKey;
   label: string;
   totalOrder: number;
-  totalDelivery: number;
+  totalConfirmed: number;
+  totalReceived: number;
   gap: number;
 };
 
-export type DeliveryQueueRow = {
+export type ReceivingQueueRow = {
   orderId: string;
   kodeOrder: string;
   tanggalOrder: string;
@@ -35,7 +36,7 @@ export type DeliveryQueueRow = {
   deliveryNote: string;
   remarksOrdering: string;
   remarksDelivery: string;
-  items: DeliveryOrderItem[];
+  items: ReceivingOrderItem[];
   cb1tr: OrderMetricPair;
   cb2tr: OrderMetricPair;
   camNo01: OrderMetricPair;
@@ -45,25 +46,26 @@ export type DeliveryQueueRow = {
   sortDateValue: number;
 };
 
-export type DeliveryOrderItem = {
+export type ReceivingOrderItem = {
   detailId: string;
   itemCode: string;
   itemName: string;
   qtyOrder: number;
   qtyConfirm: number;
+  qtyReceived: number;
   lineNo: number;
 };
 
-export type DeliveryPageData = {
-  activeOrders: DeliveryQueueRow[];
-  finishedOrders: DeliveryQueueRow[];
-  summary: DeliverySummary[];
+export type ReceivingPageData = {
+  activeOrders: ReceivingQueueRow[];
+  finishedOrders: ReceivingQueueRow[];
+  summary: ReceivingSummary[];
 };
 
 export { getOrderingFilterOptions, normalizeOrderingFilter, resolveOrderingContext };
 export type { OrderingFilter, OrderingFilterOptions, ResolvedOrderingContext };
 
-export async function getDeliveryPageData(filter: OrderingFilter): Promise<DeliveryPageData> {
+export async function getReceivingPageData(filter: OrderingFilter): Promise<ReceivingPageData> {
   const headers = await prisma.orderHeader.findMany({
     where: {
       kodeOrder: { startsWith: "ORD-" },
@@ -91,6 +93,7 @@ export async function getDeliveryPageData(filter: OrderingFilter): Promise<Deliv
           itemName: true,
           qtyOrder: true,
           qtyConfirm: true,
+          qtyReceived: true,
           lineNo: true,
         },
         orderBy: [{ lineNo: "asc" }, { detailId: "asc" }],
@@ -112,6 +115,7 @@ export async function getDeliveryPageData(filter: OrderingFilter): Promise<Deliv
       metrics[metricKey] = {
         order: detail.qtyOrder ?? 0,
         delivery: detail.qtyConfirm ?? 0,
+        received: detail.qtyReceived ?? 0,
       };
     }
 
@@ -132,6 +136,7 @@ export async function getDeliveryPageData(filter: OrderingFilter): Promise<Deliv
         itemName: normalizeText(detail.itemName),
         qtyOrder: detail.qtyOrder ?? 0,
         qtyConfirm: detail.qtyConfirm ?? 0,
+        qtyReceived: detail.qtyReceived ?? 0,
         lineNo: detail.lineNo ?? 0,
       })),
       cb1tr: metrics.cb1tr,
@@ -144,13 +149,10 @@ export async function getDeliveryPageData(filter: OrderingFilter): Promise<Deliv
     };
   });
 
-  const activeOrders = rows.filter((row) => row.statusOrder.toLowerCase() === "submitted");
-  const finishedOrders = rows.filter((row) => {
-    const status = row.statusOrder.toLowerCase();
-    return status === "confirmed" || status === "checked";
-  });
+  const activeOrders = rows.filter((row) => row.statusOrder.toLowerCase() === "confirmed");
+  const finishedOrders = rows.filter((row) => row.statusOrder.toLowerCase() === "checked");
 
-  const summary = DELIVERY_SUMMARY_CONFIGS.map((config) => {
+  const summary = RECEIVING_SUMMARY_CONFIGS.map((config) => {
     const totals = headers.reduce(
       (acc, header) => {
         for (const detail of header.details) {
@@ -159,20 +161,22 @@ export async function getDeliveryPageData(filter: OrderingFilter): Promise<Deliv
           }
 
           acc.totalOrder += detail.qtyOrder ?? 0;
-          acc.totalDelivery += detail.qtyConfirm ?? 0;
+          acc.totalConfirmed += detail.qtyConfirm ?? 0;
+          acc.totalReceived += detail.qtyReceived ?? 0;
         }
 
         return acc;
       },
-      { totalOrder: 0, totalDelivery: 0 }
+      { totalOrder: 0, totalConfirmed: 0, totalReceived: 0 }
     );
 
     return {
       key: config.key,
       label: config.label,
       totalOrder: totals.totalOrder,
-      totalDelivery: totals.totalDelivery,
-      gap: totals.totalDelivery - totals.totalOrder,
+      totalConfirmed: totals.totalConfirmed,
+      totalReceived: totals.totalReceived,
+      gap: totals.totalReceived - totals.totalConfirmed,
     };
   });
 
@@ -183,13 +187,13 @@ function normalizeText(value: string | null | undefined) {
   return value?.trim() || "-";
 }
 
-function createEmptyMetrics(): Record<DeliveryMetricKey, OrderMetricPair> {
+function createEmptyMetrics(): Record<ReceivingMetricKey, OrderMetricPair> {
   return {
-    cb1tr: { order: 0, delivery: 0 },
-    cb2tr: { order: 0, delivery: 0 },
-    camNo01: { order: 0, delivery: 0 },
-    camNo02: { order: 0, delivery: 0 },
-    cr1tr: { order: 0, delivery: 0 },
+    cb1tr: { order: 0, delivery: 0, received: 0 },
+    cb2tr: { order: 0, delivery: 0, received: 0 },
+    camNo01: { order: 0, delivery: 0, received: 0 },
+    camNo02: { order: 0, delivery: 0, received: 0 },
+    cr1tr: { order: 0, delivery: 0, received: 0 },
   };
 }
 
@@ -202,8 +206,8 @@ function formatDateLabel(value: Date) {
 
 const MONTH_NAMES_SHORT = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
 
-const DELIVERY_SUMMARY_CONFIGS: Array<{
-  key: DeliveryMetricKey;
+const RECEIVING_SUMMARY_CONFIGS: Array<{
+  key: ReceivingMetricKey;
   label: string;
   itemCode: string;
 }> = [
@@ -214,7 +218,7 @@ const DELIVERY_SUMMARY_CONFIGS: Array<{
   { key: "cr1tr", label: "CR_1TR", itemCode: "CR_1TR" },
 ];
 
-const ITEM_CODE_TO_METRIC_KEY: Record<string, DeliveryMetricKey> = {
+const ITEM_CODE_TO_METRIC_KEY: Record<string, ReceivingMetricKey> = {
   CB_1TR: "cb1tr",
   CB_2TR: "cb2tr",
   CAM_01: "camNo01",

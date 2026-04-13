@@ -6,7 +6,9 @@ import type {
   OrderingFilterOptions,
   OrderReportRow,
 } from "@/lib/order-report";
+import JunbikiOrderForm from "@/components/ordering/JunbikiOrderForm";
 import PalletOrderForm from "@/components/ordering/PalletOrderForm";
+import AutoSubmitReportFilters from "@/components/shared/AutoSubmitReportFilters";
 import { useRouter } from "next/navigation";
 import { useState, type ReactNode } from "react";
 
@@ -22,6 +24,42 @@ type ToastState = {
   type: "success" | "error";
   message: string;
 } | null;
+
+type EditablePalletOrder = {
+  orderId: string;
+  truckType: "PALLET";
+  kodeOrder: string;
+  tanggalOrder: string;
+  shift: string;
+  dayNight: string;
+  ritaseRequest: number;
+  remarksOrdering: string;
+  items: Array<{
+    itemCode: string;
+    qtyOrder: number;
+  }>;
+};
+
+type EditableJunbikiOrder = {
+  orderId: string;
+  truckType: "JUNBIKI";
+  kodeOrder: string;
+  tanggalOrder: string;
+  shift: string;
+  dayNight: string;
+  ritaseRequest: number;
+  ratioCb1tr: number;
+  ratioCb2tr: number;
+  remarksOrdering: string;
+  selectedShells: Array<{
+    code: string;
+    section: "CB_1TR" | "CB_2TR";
+    status: "active" | "blocked";
+    groupNumber: number;
+  }>;
+};
+
+type EditableOrder = EditablePalletOrder | EditableJunbikiOrder;
 
 const tableColumns: Array<{
   key:
@@ -68,10 +106,16 @@ export default function OrderingReport({
 }: OrderingReportProps) {
   const router = useRouter();
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<OrderReportRow | null>(null);
+  const [loadingEditId, setLoadingEditId] = useState<string | null>(null);
+  const [editableOrder, setEditableOrder] = useState<EditableOrder | null>(null);
   const [toast, setToast] = useState<ToastState>(null);
   const [activeModal, setActiveModal] = useState<"junbiki" | "pallet" | null>(null);
-  const activeRows = rows.filter((row) => row.statusOrder.toLowerCase() === "submitted");
-  const finishedRows = rows.filter((row) => row.statusOrder.toLowerCase() === "confirmed");
+  const activeRows = rows.filter((row) => {
+    const status = row.statusOrder.toLowerCase();
+    return status === "submitted" || status === "confirmed";
+  });
+  const finishedRows = rows.filter((row) => row.statusOrder.toLowerCase() === "checked");
 
   async function handleDelete(orderId: string) {
     try {
@@ -94,6 +138,31 @@ export default function OrderingReport({
     } finally {
       setDeletingId(null);
     }
+  }
+
+  async function handleEdit(order: OrderReportRow) {
+    try {
+      setLoadingEditId(order.orderId);
+      const res = await fetch(`/api/ordering/${order.orderId}`, { cache: "no-store" });
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error ?? "Gagal mengambil detail order");
+      }
+
+      setEditableOrder(data);
+      setActiveModal(data.truckType === "JUNBIKI" ? "junbiki" : "pallet");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Terjadi kesalahan";
+      setToast({ type: "error", message });
+    } finally {
+      setLoadingEditId(null);
+    }
+  }
+
+  function closeOrderModal() {
+    setActiveModal(null);
+    setEditableOrder(null);
   }
 
   return (
@@ -126,45 +195,7 @@ export default function OrderingReport({
             </div>
           </div>
 
-          <form className="grid gap-3 sm:grid-cols-3 xl:min-w-[560px]" method="get">
-            <FilterField label="Tanggal">
-              <SelectField name="date" defaultValue={selectedFilter.date}>
-                {filterOptions.dates.map((date) => (
-                  <option key={date} value={date}>
-                    {formatDateOption(date)}
-                  </option>
-                ))}
-              </SelectField>
-            </FilterField>
-
-            <FilterField label="Shift">
-              <SelectField name="shift" defaultValue={selectedFilter.shift}>
-                {filterOptions.shifts.map((shift) => (
-                  <option key={shift} value={shift}>
-                    {shift || "Tanpa Shift"}
-                  </option>
-                ))}
-              </SelectField>
-            </FilterField>
-
-            <FilterField label="Day / Night">
-              <div className="flex gap-2">
-                <SelectField name="dayNight" defaultValue={selectedFilter.dayNight}>
-                  {filterOptions.dayNights.map((dayNight) => (
-                    <option key={dayNight} value={dayNight}>
-                      {dayNight}
-                    </option>
-                  ))}
-                </SelectField>
-                <button
-                  type="submit"
-                  className="inline-flex h-11 items-center justify-center rounded-xl bg-slate-900 px-4 text-sm font-semibold text-white transition hover:bg-slate-700"
-                >
-                  Terapkan
-                </button>
-              </div>
-            </FilterField>
-          </form>
+          <AutoSubmitReportFilters selectedFilter={selectedFilter} filterOptions={filterOptions} />
         </div>
       </div>
 
@@ -200,19 +231,25 @@ export default function OrderingReport({
 
       <OrderQueueTable
         title="Active Order"
-        description={`Order dengan status Submitted untuk ${formatFilterLabel(selectedFilter)}.`}
+        description={`Order dengan status Submitted / Confirmed untuk ${formatFilterLabel(selectedFilter)}.`}
         rows={activeRows}
         deletingId={deletingId}
-        onDelete={handleDelete}
+        pendingDeleteId={pendingDelete?.orderId ?? null}
+        onRequestDelete={setPendingDelete}
+        onEdit={handleEdit}
+        loadingEditId={loadingEditId}
         showDelivery={false}
       />
 
       <OrderQueueTable
         title="Finish Order"
-        description={`Order dengan status Confirmed untuk ${formatFilterLabel(selectedFilter)}.`}
+        description={`Order dengan status Checked untuk ${formatFilterLabel(selectedFilter)}.`}
         rows={finishedRows}
         deletingId={deletingId}
-        onDelete={handleDelete}
+        pendingDeleteId={pendingDelete?.orderId ?? null}
+        onRequestDelete={setPendingDelete}
+        onEdit={handleEdit}
+        loadingEditId={loadingEditId}
         showDelivery
       />
 
@@ -232,28 +269,77 @@ export default function OrderingReport({
       ) : null}
 
       {activeModal === "junbiki" ? (
-        <OrderingModal title="Order Junbiki" onClose={() => setActiveModal(null)}>
-          <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-5">
-            <p className="text-sm font-semibold text-slate-900">Form Junbiki belum tersedia.</p>
-            <p className="mt-2 text-sm text-slate-600">
-              Tombol ini sekarang tetap dibuka dari halaman ordering utama lewat modal, tetapi backend dan form order Junbiki
-              memang belum ada di project saat ini.
-            </p>
-          </div>
+        <OrderingModal title="Order Junbiki" onClose={closeOrderModal} hideHeader>
+          <JunbikiOrderForm
+            orderId={editableOrder?.truckType === "JUNBIKI" ? editableOrder.orderId : undefined}
+            initialKodeOrder={editableOrder?.truckType === "JUNBIKI" ? editableOrder.kodeOrder : undefined}
+            initialValues={
+              editableOrder?.truckType === "JUNBIKI"
+                ? {
+                    tanggal_order: editableOrder.tanggalOrder,
+                    shift: editableOrder.shift as "RED" | "WHITE",
+                    day_night: editableOrder.dayNight as "DAY" | "NIGHT",
+                    ritase: editableOrder.ritaseRequest,
+                    ratio_cb_1tr: editableOrder.ratioCb1tr,
+                    ratio_cb_2tr: editableOrder.ratioCb2tr,
+                    remark: editableOrder.remarksOrdering,
+                    selected_shells: editableOrder.selectedShells,
+                  }
+                : null
+            }
+            onCancel={closeOrderModal}
+            onSuccess={(kodeOrder) => {
+              closeOrderModal();
+              setToast({ type: "success", message: `Order ${kodeOrder} berhasil disimpan` });
+              router.refresh();
+            }}
+          />
         </OrderingModal>
       ) : null}
 
       {activeModal === "pallet" ? (
-        <OrderingModal title="Order Blank Casting Pallet" onClose={() => setActiveModal(null)} size="wide">
+        <OrderingModal title="Order Pallet" onClose={closeOrderModal} size="wide">
           <PalletOrderForm
             embedded
-            onCancel={() => setActiveModal(null)}
+            orderId={editableOrder?.truckType === "PALLET" ? editableOrder.orderId : undefined}
+            initialKodeOrder={editableOrder?.truckType === "PALLET" ? editableOrder.kodeOrder : undefined}
+            initialValues={
+              editableOrder?.truckType === "PALLET"
+                ? {
+                    shift: editableOrder.shift,
+                    dayNight: editableOrder.dayNight,
+                    ritaseRequest: editableOrder.ritaseRequest,
+                    remarksOrdering: editableOrder.remarksOrdering,
+                    items: {
+                      CR_1TR: editableOrder.items.find((item) => item.itemCode === "CR_1TR")?.qtyOrder ?? 0,
+                      CAM_01: editableOrder.items.find((item) => item.itemCode === "CAM_01")?.qtyOrder ?? 0,
+                      CAM_02: editableOrder.items.find((item) => item.itemCode === "CAM_02")?.qtyOrder ?? 0,
+                      CB_1TR: editableOrder.items.find((item) => item.itemCode === "CB_1TR")?.qtyOrder ?? 0,
+                      CB_2TR: editableOrder.items.find((item) => item.itemCode === "CB_2TR")?.qtyOrder ?? 0,
+                    },
+                  }
+                : null
+            }
+            onCancel={closeOrderModal}
             onSuccess={(kodeOrder) => {
-              setActiveModal(null);
-              setToast({ type: "success", message: `Order ${kodeOrder} berhasil dibuat` });
+              closeOrderModal();
+              setToast({ type: "success", message: `Order ${kodeOrder} berhasil disimpan` });
+              router.refresh();
             }}
           />
         </OrderingModal>
+      ) : null}
+
+      {pendingDelete ? (
+        <ConfirmDeleteModal
+          order={pendingDelete}
+          deleting={deletingId === pendingDelete.orderId}
+          onClose={() => (deletingId ? null : setPendingDelete(null))}
+          onConfirm={async () => {
+            await handleDelete(pendingDelete.orderId);
+            setPendingDelete(null);
+          }}
+        />
       ) : null}
     </section>
   );
@@ -264,33 +350,36 @@ function OrderingModal({
   children,
   onClose,
   size = "default",
+  hideHeader = false,
 }: {
   title: string;
   children: ReactNode;
   onClose: () => void;
   size?: "default" | "wide";
+  hideHeader?: boolean;
 }) {
   return (
     <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-950/45 px-4 py-6">
       <div
         className={`max-h-[90vh] w-full overflow-y-auto rounded-3xl border border-slate-200 bg-white shadow-2xl ${
-          size === "wide" ? "max-w-6xl" : "max-w-2xl"
+          size === "wide" ? "max-w-[92vw]" : "max-w-[88vw]"
         }`}
       >
-        <div className="flex items-start justify-between border-b border-slate-200 px-6 py-5">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-700">Ordering</p>
-            <h2 className="mt-2 text-2xl font-bold text-slate-900">{title}</h2>
+        {hideHeader ? null : (
+          <div className="flex items-start justify-between border-b border-slate-200 px-6 py-5">
+            <div>
+              <h2 className="text-2xl font-bold text-slate-900">{title}</h2>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-xl border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
+            >
+              Tutup
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-xl border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
-          >
-            Tutup
-          </button>
-        </div>
-        <div className="px-6 py-5">{children}</div>
+        )}
+        <div className={hideHeader ? "px-6 py-6" : "px-6 py-5"}>{children}</div>
       </div>
     </div>
   );
@@ -301,14 +390,20 @@ function OrderQueueTable({
   description,
   rows,
   deletingId,
-  onDelete,
+  pendingDeleteId,
+  onRequestDelete,
+  onEdit,
+  loadingEditId,
   showDelivery,
 }: {
   title: string;
   description: string;
   rows: OrderReportRow[];
   deletingId: string | null;
-  onDelete: (orderId: string) => void;
+  pendingDeleteId: string | null;
+  onRequestDelete: (row: OrderReportRow | null) => void;
+  onEdit: (row: OrderReportRow) => void;
+  loadingEditId: string | null;
   showDelivery: boolean;
 }) {
   return (
@@ -364,14 +459,30 @@ function OrderQueueTable({
                   <RemarksCell value={row.remarksJunbikiS2} />
                   <RemarksCell value={row.remarksPalletS2} />
                   <td className="border-b border-slate-200 px-4 py-3 whitespace-nowrap">
-                    <button
-                      type="button"
-                      onClick={() => onDelete(row.orderId)}
-                      disabled={deletingId === row.orderId}
-                      className="rounded-lg border border-rose-200 px-3 py-1.5 text-xs font-semibold text-rose-700 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      {deletingId === row.orderId ? "Menghapus..." : "Delete"}
-                    </button>
+                    {row.statusOrder.toLowerCase() === "submitted" ? (
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => onEdit(row)}
+                          disabled={loadingEditId === row.orderId || deletingId === row.orderId}
+                          className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {loadingEditId === row.orderId ? "Membuka..." : "Edit"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => onRequestDelete(row)}
+                          disabled={deletingId === row.orderId}
+                          className="rounded-lg border border-rose-200 px-3 py-1.5 text-xs font-semibold text-rose-700 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {deletingId === row.orderId || pendingDeleteId === row.orderId ? "Delete" : "Delete"}
+                        </button>
+                      </div>
+                    ) : (
+                      <span className="rounded-full border border-slate-200 px-2.5 py-1 text-[11px] font-semibold text-slate-500">
+                        Locked
+                      </span>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -383,46 +494,45 @@ function OrderQueueTable({
   );
 }
 
-function SelectField({
-  name,
-  defaultValue,
-  children,
+function ConfirmDeleteModal({
+  order,
+  deleting,
+  onClose,
+  onConfirm,
 }: {
-  name: string;
-  defaultValue: string;
-  children: ReactNode;
+  order: OrderReportRow;
+  deleting: boolean;
+  onClose: () => void;
+  onConfirm: () => void | Promise<void>;
 }) {
   return (
-    <div className="relative">
-      <select
-        name={name}
-        defaultValue={defaultValue}
-        className="h-11 w-full appearance-none rounded-xl border border-slate-300 bg-white px-3 pr-10 text-sm text-slate-700 outline-none transition focus:border-sky-500"
-      >
-        {children}
-      </select>
-      <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-slate-400">
-        <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8">
-          <path d="m5 7.5 5 5 5-5" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      </span>
-    </div>
-  );
-}
-
-function FilterField({
-  label,
-  children,
-}: {
-  label: string;
-  children: ReactNode;
-}) {
-  return (
-    <div>
-      <label className="mb-1 block text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-        {label}
-      </label>
-      {children}
+    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/45 px-4 py-6">
+      <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-rose-700">Delete Order</p>
+        <h3 className="mt-2 text-xl font-bold text-slate-900">Hapus order ini?</h3>
+        <p className="mt-2 text-sm text-slate-600">
+          Order <span className="font-semibold text-slate-900">{order.code}</span> akan dihapus permanen. Aksi ini hanya
+          tersedia untuk status Submitted.
+        </p>
+        <div className="mt-5 flex justify-end gap-3">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={deleting}
+            className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-60"
+          >
+            Batal
+          </button>
+          <button
+            type="button"
+            onClick={() => void onConfirm()}
+            disabled={deleting}
+            className="rounded-xl bg-rose-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-rose-700 disabled:opacity-60"
+          >
+            {deleting ? "Menghapus..." : "Ya, hapus"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

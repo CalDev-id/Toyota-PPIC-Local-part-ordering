@@ -92,8 +92,20 @@ export async function createRoleNotification(input: CreateRoleNotificationInput)
 }
 
 export async function getNotificationsForUser(userId: string) {
+  const now = new Date();
+  const startOfYesterday = new Date(now);
+  startOfYesterday.setHours(0, 0, 0, 0);
+  startOfYesterday.setDate(startOfYesterday.getDate() - 1);
+
   const historyRecords = await prisma.notificationRecipient.findMany({
-    where: { userId },
+    where: {
+      userId,
+      notification: {
+        createdAt: {
+          gte: startOfYesterday,
+        },
+      },
+    },
     include: {
       notification: true,
     },

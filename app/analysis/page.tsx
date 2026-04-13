@@ -2,8 +2,7 @@ import DefaultLayout from "@/components/Layout/DefaultLayout";
 import AnalysisDashboard from "@/components/analysis/AnalysisDashboard";
 import {
   getAnalysisDashboardData,
-  getAnalysisFilterOptions,
-  normalizeAnalysisFilter,
+  resolveAnalysisContext,
   type AnalysisDashboardData,
   type AnalysisFilter,
   type AnalysisFilterOptions,
@@ -22,13 +21,13 @@ export default async function AnalysisPage({ searchParams }: AnalysisPageProps) 
   await requireSession();
 
   const resolvedSearchParams = searchParams ? await searchParams : undefined;
-  const selectedFilter = await normalizeAnalysisFilter({
+  const { filter: selectedFilter, options } = await resolveAnalysisContext({
     date: resolvedSearchParams?.date,
     shift: resolvedSearchParams?.shift,
     dayNight: resolvedSearchParams?.dayNight,
   });
 
-  let filterOptions: AnalysisFilterOptions = { dates: [], shifts: [], dayNights: [] };
+  const filterOptions: AnalysisFilterOptions = options;
   let dashboardData: AnalysisDashboardData = {
     volumeOrderHarian: [],
     requestVsConfirmedPerItem: [],
@@ -37,13 +36,9 @@ export default async function AnalysisPage({ searchParams }: AnalysisPageProps) 
   let errorMessage: string | null = null;
 
   try {
-    const [data, options] = await Promise.all([
-      getAnalysisDashboardData(selectedFilter),
-      getAnalysisFilterOptions(),
-    ]);
+    const data = await getAnalysisDashboardData(selectedFilter);
 
     dashboardData = data;
-    filterOptions = options;
   } catch (error) {
     console.error("Failed to load analysis dashboard", error);
     errorMessage =

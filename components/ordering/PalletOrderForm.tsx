@@ -23,6 +23,9 @@ type ToastState = {
 
 type PalletOrderFormProps = {
   embedded?: boolean;
+  orderId?: string;
+  initialValues?: PalletFormState | null;
+  initialKodeOrder?: string;
   onSuccess?: (kodeOrder: string) => void;
   onCancel?: () => void;
 };
@@ -54,17 +57,22 @@ const emptyPlans: PalletPlanState = {
 
 export default function PalletOrderForm({
   embedded = false,
+  orderId,
+  initialValues,
+  initialKodeOrder,
   onSuccess,
   onCancel,
 }: PalletOrderFormProps) {
   const router = useRouter();
-  const [form, setForm] = useState<PalletFormState>(emptyForm);
+  const [form, setForm] = useState<PalletFormState>(initialValues ?? emptyForm);
   const [plans, setPlans] = useState<PalletPlanState>(emptyPlans);
   const [loadingPlans, setLoadingPlans] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [toast, setToast] = useState<ToastState>(null);
   const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const isEditing = Boolean(orderId);
 
   useEffect(() => {
     return () => {
@@ -73,6 +81,10 @@ export default function PalletOrderForm({
       }
     };
   }, []);
+
+  useEffect(() => {
+    setForm(initialValues ?? emptyForm);
+  }, [initialValues]);
 
   useEffect(() => {
     if (!form.shift || !form.dayNight) {
@@ -137,8 +149,8 @@ export default function PalletOrderForm({
         })),
       };
 
-      const res = await fetch("/api/ordering/pallet", {
-        method: "POST",
+      const res = await fetch(isEditing && orderId ? `/api/ordering/${orderId}` : "/api/ordering/pallet", {
+        method: isEditing ? "PUT" : "POST",
         headers: {
           "Content-Type": "application/json",
         },
@@ -152,13 +164,13 @@ export default function PalletOrderForm({
 
       setForm(emptyForm);
       setPlans(emptyPlans);
-      onSuccess?.(data.kodeOrder);
+      onSuccess?.(data.kodeOrder ?? initialKodeOrder ?? "");
 
       if (embedded) {
         router.refresh();
       } else {
         const params = new URLSearchParams({
-          success: `Order ${data.kodeOrder} berhasil dibuat`,
+          success: `Order ${data.kodeOrder} berhasil ${isEditing ? "diperbarui" : "dibuat"}`,
         });
         router.push(`/ordering?${params.toString()}`);
         router.refresh();
@@ -187,7 +199,7 @@ export default function PalletOrderForm({
       {!embedded ? (
         <div className="rounded-2xl border border-slate-200 bg-white/90 p-6 shadow-sm">
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-sky-700">Ordering</p>
-          <h1 className="mt-2 text-2xl font-bold text-slate-900">Order Blank Casting Pallet</h1>
+          <h1 className="mt-2 text-2xl font-bold text-slate-900">Order Pallet</h1>
           <p className="mt-2 text-sm text-slate-600">
             Buat order Pallet dalam satu kali submit, lengkap dengan header dan item order.
           </p>
@@ -291,7 +303,7 @@ export default function PalletOrderForm({
             disabled={saving}
             className="inline-flex h-11 items-center justify-center rounded-xl bg-slate-900 px-4 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {saving ? "Menyimpan..." : "Buat Order Baru"}
+            {saving ? "Menyimpan..." : isEditing ? "Update Order" : "Buat Order Baru"}
           </button>
           <button
             type="button"
@@ -455,26 +467,19 @@ function NumberField({
   value: number;
   onChange: (value: number) => void;
 }) {
-  const [inputValue, setInputValue] = useState(value === 0 ? "" : String(value));
-
-  useEffect(() => {
-    setInputValue(value === 0 ? "" : String(value));
-  }, [value]);
-
   return (
     <div>
       <label className="mb-1 block text-sm font-medium text-slate-700">{label}</label>
       <input
         type="text"
         inputMode="numeric"
-        value={inputValue}
+        value={value === 0 ? "" : String(value)}
         onChange={(event) => {
           const numeric = event.target.value.replace(/[^\d]/g, "");
-          setInputValue(numeric);
           onChange(Number(numeric || 0));
         }}
         onBlur={() => {
-          if (!inputValue) {
+          if (value === 0) {
             onChange(0);
           }
         }}

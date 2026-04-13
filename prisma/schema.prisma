@@ -40,6 +40,7 @@ enum Role {
 enum NotificationType {
   ORDER_CREATED
   DELIVERY_CONFIRMED
+  RECEIVING_CHECKED
 }
 
 model Account {
@@ -102,8 +103,12 @@ model OrderHeader {
   dayNight        String?       @map("day_night")
   truckType       String?       @map("truck_type")
   ritaseRequest   Int?          @default(0) @map("ritase_request")
+  ratioCb1tr      Int           @default(0) @map("ratio_cb_1tr")
+  ratioCb2tr      Int           @default(0) @map("ratio_cb_2tr")
   statusOrder     String?       @map("status_order")
   deliveryNote    String?       @map("delivery_note")
+  shellStateCb1tr String?       @map("shell_state_cb_1tr")
+  shellStateCb2tr String?       @map("shell_state_cb_2tr")
   remarksOrdering String?       @map("remarks_ordering")
   remarksDelivery String?       @map("remarks_delivery")
   createdBy       String?       @map("created_by")

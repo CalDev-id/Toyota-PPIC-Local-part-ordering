@@ -30,8 +30,10 @@ const OrderingReport = dynamic(() => import("@/components/ordering/OrderingRepor
 });
 
 export default function OrderingReportShell(props: OrderingReportShellProps) {
-  const [toastMessage, setToastMessage] = useState(props.successMessage ?? "");
+  const [dismissedMessage, setDismissedMessage] = useState<string | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const toastMessage =
+    props.successMessage && props.successMessage !== dismissedMessage ? props.successMessage : "";
 
   useEffect(() => {
     if (timeoutRef.current) {
@@ -39,13 +41,11 @@ export default function OrderingReportShell(props: OrderingReportShellProps) {
     }
 
     if (!props.successMessage) {
-      setToastMessage("");
       return;
     }
 
-    setToastMessage(props.successMessage);
     timeoutRef.current = setTimeout(() => {
-      setToastMessage("");
+      setDismissedMessage(props.successMessage ?? null);
       timeoutRef.current = null;
     }, 3200);
 

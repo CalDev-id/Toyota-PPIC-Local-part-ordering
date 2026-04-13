@@ -12,6 +12,14 @@ export type AnalysisFilterOptions = {
   dayNights: string[];
 };
 
+export type ResolvedAnalysisContext = {
+  filter: AnalysisFilter;
+  options: AnalysisFilterOptions;
+};
+
+const DEFAULT_SHIFT = "WHITE";
+const DEFAULT_DAY_NIGHT = "DAY";
+
 export type DailyVolumePoint = {
   date: string;
   label: string;
@@ -72,6 +80,10 @@ export async function getAnalysisFilterOptions(): Promise<AnalysisFilterOptions>
     dayNights.add(normalizeDayNight(row.dayNight));
   }
 
+  dates.add(formatDateInput(new Date()));
+  shifts.add(DEFAULT_SHIFT);
+  dayNights.add(DEFAULT_DAY_NIGHT);
+
   return {
     dates: Array.from(dates).sort((a, b) => b.localeCompare(a)),
     shifts: sortSimple(Array.from(shifts).filter(Boolean)),
@@ -82,27 +94,43 @@ export async function getAnalysisFilterOptions(): Promise<AnalysisFilterOptions>
 export async function normalizeAnalysisFilter(
   input: Partial<AnalysisFilter> | undefined
 ): Promise<AnalysisFilter> {
+  const { filter } = await resolveAnalysisContext(input);
+  return filter;
+}
+
+export async function resolveAnalysisContext(
+  input: Partial<AnalysisFilter> | undefined
+): Promise<ResolvedAnalysisContext> {
   const options = await getAnalysisFilterOptions();
-  const latestFallback = await getLatestAnalysisFilterFallback();
+  const today = formatDateInput(new Date());
 
   const date =
     input?.date && options.dates.includes(input.date)
       ? input.date
-      : latestFallback.date || options.dates[0] || formatDateInput(new Date());
+      : options.dates.includes(today)
+        ? today
+        : options.dates[0] || today;
 
   const shiftCandidate = normalizeShift(input?.shift);
   const shift =
     shiftCandidate && options.shifts.includes(shiftCandidate)
       ? shiftCandidate
-      : latestFallback.shift || options.shifts[0] || "";
+      : options.shifts.includes(DEFAULT_SHIFT)
+        ? DEFAULT_SHIFT
+        : options.shifts[0] || DEFAULT_SHIFT;
 
   const dayNightCandidate = normalizeDayNight(input?.dayNight);
   const dayNight =
     dayNightCandidate && options.dayNights.includes(dayNightCandidate)
       ? dayNightCandidate
-      : latestFallback.dayNight || options.dayNights[0] || "";
+      : options.dayNights.includes(DEFAULT_DAY_NIGHT)
+        ? DEFAULT_DAY_NIGHT
+        : options.dayNights[0] || DEFAULT_DAY_NIGHT;
 
-  return { date, shift, dayNight };
+  return {
+    filter: { date, shift, dayNight },
+    options,
+  };
 }
 
 export async function getAnalysisDashboardData(filter: AnalysisFilter): Promise<AnalysisDashboardData> {
@@ -118,7 +146,15 @@ export async function getAnalysisDashboardData(filter: AnalysisFilter): Promise<
         shift: filter.shift,
         dayNight: nullableFilterValue(filter.dayNight),
       },
-      include: { details: true },
+      select: {
+        tanggalOrder: true,
+        details: {
+          select: {
+            qtyOrder: true,
+            qtyConfirm: true,
+          },
+        },
+      },
       orderBy: [{ tanggalOrder: "asc" }, { waktuOrder: "asc" }],
     }),
     prisma.orderHeader.findMany({
@@ -128,7 +164,15 @@ export async function getAnalysisDashboardData(filter: AnalysisFilter): Promise<
         shift: filter.shift,
         dayNight: nullableFilterValue(filter.dayNight),
       },
-      include: { details: true },
+      select: {
+        details: {
+          select: {
+            itemCode: true,
+            qtyOrder: true,
+            qtyConfirm: true,
+          },
+        },
+      },
       orderBy: [{ waktuOrder: "asc" }, { kodeOrder: "asc" }],
     }),
     prisma.dailyPlanning.findFirst({
@@ -200,39 +244,6 @@ export async function getAnalysisDashboardData(filter: AnalysisFilter): Promise<
       deliveryTotal: value.deliveryTotal,
     })),
     requestVsConfirmedPerItem: itemMetrics,
-  };
-}
-
-async function getLatestAnalysisFilterFallback(): Promise<AnalysisFilter> {
-  const latestPlanning = await prisma.dailyPlanning.findFirst({
-    orderBy: [{ tanggal: "desc" }, { shift: "asc" }, { dayNight: "asc" }],
-  });
-
-  if (latestPlanning) {
-    return {
-      date: formatDateInput(latestPlanning.tanggal),
-      shift: normalizeShift(latestPlanning.shift),
-      dayNight: normalizeDayNight(latestPlanning.dayNight),
-    };
-  }
-
-  const latestOrder = await prisma.orderHeader.findFirst({
-    where: { kodeOrder: { startsWith: "ORD-" } },
-    orderBy: [{ tanggalOrder: "desc" }, { waktuOrder: "desc" }],
-  });
-
-  if (latestOrder) {
-    return {
-      date: formatDateInput(latestOrder.tanggalOrder),
-      shift: normalizeShift(latestOrder.shift),
-      dayNight: normalizeDayNight(latestOrder.dayNight),
-    };
-  }
-
-  return {
-    date: formatDateInput(new Date()),
-    shift: "",
-    dayNight: "",
   };
 }
 

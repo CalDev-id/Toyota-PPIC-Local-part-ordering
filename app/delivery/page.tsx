@@ -4,8 +4,7 @@ import {
   type DeliveryQueueRow,
   type DeliverySummary,
   getDeliveryPageData,
-  getOrderingFilterOptions,
-  normalizeOrderingFilter,
+  resolveOrderingContext,
   type OrderingFilter,
   type OrderingFilterOptions,
 } from "@/lib/delivery-report";
@@ -23,13 +22,13 @@ export default async function DeliveryPage({ searchParams }: DeliveryPageProps) 
   await requireRole(["ADMIN", "DELIVERY"]);
 
   const resolvedSearchParams = searchParams ? await searchParams : undefined;
-  const selectedFilter = await normalizeOrderingFilter({
+  const { filter: selectedFilter, options } = await resolveOrderingContext({
     date: resolvedSearchParams?.date,
     shift: resolvedSearchParams?.shift,
     dayNight: resolvedSearchParams?.dayNight,
   });
 
-  let filterOptions: OrderingFilterOptions = { dates: [], shifts: [], dayNights: [] };
+  const filterOptions: OrderingFilterOptions = options;
   const activeFilter: OrderingFilter = selectedFilter;
   let errorMessage: string | null = null;
   let activeOrders: DeliveryQueueRow[] = [];
@@ -37,15 +36,11 @@ export default async function DeliveryPage({ searchParams }: DeliveryPageProps) 
   let summary: DeliverySummary[] = [];
 
   try {
-    const [deliveryData, options] = await Promise.all([
-      getDeliveryPageData(selectedFilter),
-      getOrderingFilterOptions(),
-    ]);
+    const deliveryData = await getDeliveryPageData(selectedFilter);
 
     activeOrders = deliveryData.activeOrders;
     finishedOrders = deliveryData.finishedOrders;
     summary = deliveryData.summary;
-    filterOptions = options;
   } catch (error) {
     console.error("Failed to load delivery queue", error);
     errorMessage =

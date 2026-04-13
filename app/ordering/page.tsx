@@ -2,9 +2,8 @@ import DefaultLayout from "@/components/Layout/DefaultLayout";
 import OrderingReportShell from "@/components/ordering/OrderingReportShell";
 import {
   buildOrderItemSummaries,
-  getOrderingFilterOptions,
   getOrderReportRows,
-  normalizeOrderingFilter,
+  resolveOrderingContext,
   type OrderingFilter,
   type OrderingFilterOptions,
   type OrderReportRow,
@@ -24,24 +23,20 @@ export default async function OrderingPage({ searchParams }: OrderingPageProps) 
   await requireRole(["ADMIN", "ORDERING"]);
 
   const resolvedSearchParams = searchParams ? await searchParams : undefined;
-  const selectedFilter = await normalizeOrderingFilter({
+  const { filter: selectedFilter, options } = await resolveOrderingContext({
     date: resolvedSearchParams?.date,
     shift: resolvedSearchParams?.shift,
     dayNight: resolvedSearchParams?.dayNight,
   });
 
   let rows: OrderReportRow[] = [];
-  let filterOptions: OrderingFilterOptions = { dates: [], shifts: [], dayNights: [] };
+  const filterOptions: OrderingFilterOptions = options;
   const activeFilter: OrderingFilter = selectedFilter;
   let errorMessage: string | null = null;
 
   try {
-    const [reportRows, options] = await Promise.all([
-      getOrderReportRows(selectedFilter),
-      getOrderingFilterOptions(),
-    ]);
+    const reportRows = await getOrderReportRows(selectedFilter);
     rows = reportRows;
-    filterOptions = options;
   } catch (error) {
     console.error("Failed to load ordering report", error);
     errorMessage =

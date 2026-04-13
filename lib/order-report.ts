@@ -10,6 +10,7 @@ export type OrderMetricKey =
 export type OrderMetricPair = {
   order: number;
   delivery: number;
+  received?: number;
 };
 
 export type OrderReportRow = {
@@ -53,6 +54,14 @@ export type OrderingFilterOptions = {
   shifts: string[];
   dayNights: string[];
 };
+
+export type ResolvedOrderingContext = {
+  filter: OrderingFilter;
+  options: OrderingFilterOptions;
+};
+
+const DEFAULT_SHIFT = "WHITE";
+const DEFAULT_DAY_NIGHT = "DAY";
 
 type MetricConfig = {
   key: OrderMetricKey;
@@ -144,6 +153,10 @@ export async function getOrderingFilterOptions(): Promise<OrderingFilterOptions>
     dayNights.add(normalizeDayNight(row.dayNight));
   }
 
+  dates.add(formatDateInput(new Date()));
+  shifts.add(DEFAULT_SHIFT);
+  dayNights.add(DEFAULT_DAY_NIGHT);
+
   return {
     dates: Array.from(dates).sort((a, b) => b.localeCompare(a)),
     shifts: sortSimple(Array.from(shifts).filter(Boolean)),
@@ -154,26 +167,42 @@ export async function getOrderingFilterOptions(): Promise<OrderingFilterOptions>
 export async function normalizeOrderingFilter(
   input: Partial<OrderingFilter> | undefined
 ): Promise<OrderingFilter> {
+  const { filter } = await resolveOrderingContext(input);
+  return filter;
+}
+
+export async function resolveOrderingContext(
+  input: Partial<OrderingFilter> | undefined
+): Promise<ResolvedOrderingContext> {
   const options = await getOrderingFilterOptions();
-  const latestFallback = await getLatestOrderingFilterFallback();
+  const today = formatDateInput(new Date());
 
   const date =
     input?.date && options.dates.includes(input.date)
       ? input.date
-      : latestFallback.date || options.dates[0] || formatDateInput(new Date());
+      : options.dates.includes(today)
+        ? today
+        : options.dates[0] || today;
 
   const shiftCandidate = normalizeShift(input?.shift);
   const shift =
     shiftCandidate && options.shifts.includes(shiftCandidate)
       ? shiftCandidate
-      : latestFallback.shift || options.shifts[0] || "";
+      : options.shifts.includes(DEFAULT_SHIFT)
+        ? DEFAULT_SHIFT
+        : options.shifts[0] || DEFAULT_SHIFT;
 
   const dayNightCandidate = normalizeDayNight(input?.dayNight);
   const dayNight = options.dayNights.includes(dayNightCandidate)
     ? dayNightCandidate
-    : latestFallback.dayNight || options.dayNights[0] || "";
+    : options.dayNights.includes(DEFAULT_DAY_NIGHT)
+      ? DEFAULT_DAY_NIGHT
+      : options.dayNights[0] || DEFAULT_DAY_NIGHT;
 
-  return { date, shift, dayNight };
+  return {
+    filter: { date, shift, dayNight },
+    options,
+  };
 }
 
 export async function getOrderReportRows(filter: OrderingFilter): Promise<OrderReportRow[]> {
@@ -184,8 +213,23 @@ export async function getOrderReportRows(filter: OrderingFilter): Promise<OrderR
       shift: filter.shift,
       dayNight: nullableFilterValue(filter.dayNight),
     },
-    include: {
+    select: {
+      orderId: true,
+      tanggalOrder: true,
+      waktuOrder: true,
+      kodeOrder: true,
+      shift: true,
+      dayNight: true,
+      truckType: true,
+      statusOrder: true,
+      remarksOrdering: true,
       details: {
+        select: {
+          itemCode: true,
+          qtyOrder: true,
+          qtyConfirm: true,
+          lineNo: true,
+        },
         orderBy: { lineNo: "asc" },
       },
     },
@@ -277,39 +321,6 @@ export async function buildOrderItemSummaries(
       gap: totals.deliveryTotal - totals.orderTotal,
     };
   });
-}
-
-async function getLatestOrderingFilterFallback(): Promise<OrderingFilter> {
-  const latestPlanning = await prisma.dailyPlanning.findFirst({
-    orderBy: [{ tanggal: "desc" }, { shift: "asc" }, { dayNight: "asc" }],
-  });
-
-  if (latestPlanning) {
-    return {
-      date: formatDateInput(latestPlanning.tanggal),
-      shift: normalizeShift(latestPlanning.shift),
-      dayNight: normalizeDayNight(latestPlanning.dayNight),
-    };
-  }
-
-  const latestOrder = await prisma.orderHeader.findFirst({
-    where: { kodeOrder: { startsWith: "ORD-" } },
-    orderBy: [{ tanggalOrder: "desc" }, { waktuOrder: "desc" }],
-  });
-
-  if (latestOrder) {
-    return {
-      date: formatDateInput(latestOrder.tanggalOrder),
-      shift: normalizeShift(latestOrder.shift),
-      dayNight: normalizeDayNight(latestOrder.dayNight),
-    };
-  }
-
-  return {
-    date: formatDateInput(new Date()),
-    shift: "",
-    dayNight: "",
-  };
 }
 
 function createEmptyMetricMap(): Record<OrderMetricKey, OrderMetricPair> {

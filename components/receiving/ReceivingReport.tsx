@@ -2,37 +2,35 @@
 
 import AutoSubmitReportFilters from "@/components/shared/AutoSubmitReportFilters";
 import type {
-  DeliveryQueueRow,
-  DeliverySummary,
-  DeliveryMetricKey,
   OrderingFilter,
   OrderingFilterOptions,
-} from "@/lib/delivery-report";
+  ReceivingMetricKey,
+  ReceivingQueueRow,
+  ReceivingSummary,
+} from "@/lib/receiving-report";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
-type DeliveryReportProps = {
-  activeOrders: DeliveryQueueRow[];
-  finishedOrders: DeliveryQueueRow[];
-  summary: DeliverySummary[];
+type ReceivingReportProps = {
+  activeOrders: ReceivingQueueRow[];
+  finishedOrders: ReceivingQueueRow[];
+  summary: ReceivingSummary[];
   selectedFilter: OrderingFilter;
   filterOptions: OrderingFilterOptions;
   errorMessage?: string | null;
 };
 
-export default function DeliveryReport({
+export default function ReceivingReport({
   activeOrders,
   finishedOrders,
   summary,
   selectedFilter,
   filterOptions,
   errorMessage,
-}: DeliveryReportProps) {
+}: ReceivingReportProps) {
   const router = useRouter();
-  const [selectedOrder, setSelectedOrder] = useState<DeliveryQueueRow | null>(null);
-  const [deliveryNote, setDeliveryNote] = useState("");
-  const [remarksDelivery, setRemarksDelivery] = useState("");
-  const [confirmValues, setConfirmValues] = useState<Record<string, string>>({});
+  const [selectedOrder, setSelectedOrder] = useState<ReceivingQueueRow | null>(null);
+  const [receivedValues, setReceivedValues] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
   const [toastMessage, setToastMessage] = useState("");
@@ -46,51 +44,35 @@ export default function DeliveryReport({
     };
   }, []);
 
-  function openConfirmModal(order: DeliveryQueueRow) {
+  function openCheckModal(order: ReceivingQueueRow) {
     setSelectedOrder(order);
-    setDeliveryNote("");
-    setRemarksDelivery("");
-    setConfirmValues(
-      Object.fromEntries(order.items.map((item) => [item.itemCode, ""]))
-    );
+    setReceivedValues(Object.fromEntries(order.items.map((item) => [item.itemCode, String(item.qtyReceived || "")])));
     setFormError("");
   }
 
-  function closeConfirmModal() {
+  function closeCheckModal() {
     if (saving) {
       return;
     }
 
     setSelectedOrder(null);
-    setDeliveryNote("");
-    setRemarksDelivery("");
-    setConfirmValues({});
+    setReceivedValues({});
     setFormError("");
   }
 
-  async function handleConfirmSubmit() {
+  async function handleCheckSubmit() {
     if (!selectedOrder) {
       return;
     }
 
-    if (!deliveryNote.trim()) {
-      setFormError("Delivery Note wajib diisi");
-      return;
-    }
-
-    if (!remarksDelivery.trim()) {
-      setFormError("Remarks delivery wajib diisi");
-      return;
-    }
-
     const invalidItem = selectedOrder.items.find((item) => {
-      const rawValue = confirmValues[item.itemCode] ?? "";
+      const rawValue = receivedValues[item.itemCode] ?? "";
       const value = rawValue.trim() === "" ? 0 : Number(rawValue);
       return !Number.isFinite(value) || value < 0;
     });
 
     if (invalidItem) {
-      setFormError(`Qty confirm pada ${invalidItem.itemCode} tidak valid`);
+      setFormError(`Qty received pada ${invalidItem.itemCode} tidak valid`);
       return;
     }
 
@@ -98,28 +80,26 @@ export default function DeliveryReport({
       setSaving(true);
       setFormError("");
 
-      const res = await fetch(`/api/delivery/${selectedOrder.orderId}/confirm`, {
+      const res = await fetch(`/api/receiving/${selectedOrder.orderId}/check`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          deliveryNote,
-          remarksDelivery,
           items: selectedOrder.items.map((item) => ({
             itemCode: item.itemCode,
-            qtyConfirm: Number(confirmValues[item.itemCode] ?? "") || 0,
+            qtyReceived: Number(receivedValues[item.itemCode] ?? "") || 0,
           })),
         }),
       });
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.error ?? "Gagal mengonfirmasi delivery order");
+        throw new Error(data.error ?? "Gagal menyimpan receiving order");
       }
 
-      closeConfirmModal();
-      setToastMessage(`Order ${selectedOrder.kodeOrder} berhasil dikonfirmasi`);
+      closeCheckModal();
+      setToastMessage(`Order ${selectedOrder.kodeOrder} berhasil di-check receiving`);
       toastTimeoutRef.current = setTimeout(() => {
         setToastMessage("");
         toastTimeoutRef.current = null;
@@ -137,12 +117,12 @@ export default function DeliveryReport({
       <div className="rounded-2xl border border-slate-200 bg-white/90 p-6 shadow-sm">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-sky-700">
-              Delivery Queue
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-700">
+              Receiving Queue
             </p>
-            <h1 className="mt-2 text-2xl font-bold text-slate-900">Summary Order</h1>
+            <h1 className="mt-2 text-2xl font-bold text-slate-900">Summary Receiving</h1>
             <p className="mt-2 text-sm text-slate-600">
-              Monitor order masuk untuk delivery, termasuk queue aktif dan order yang sudah selesai.
+              Monitor order confirmed dari delivery, input qty received, dan pantau order yang sudah checked.
             </p>
           </div>
 
@@ -161,44 +141,40 @@ export default function DeliveryReport({
           <SummaryCard
             key={item.key}
             label={item.label}
-            totalOrder={item.totalOrder}
-            totalDelivery={item.totalDelivery}
+            totalConfirmed={item.totalConfirmed}
+            totalReceived={item.totalReceived}
             gap={item.gap}
           />
         ))}
       </div>
 
       <QueueTable
-        title="Active Order"
-        description={`Order dengan status Submitted untuk ${formatFilterLabel(selectedFilter)}.`}
+        title="Active Receiving"
+        description={`Order dengan status Confirmed untuk ${formatFilterLabel(selectedFilter)}.`}
         rows={activeOrders}
-        showDelivery={false}
-        onConfirm={openConfirmModal}
+        showReceived={false}
+        onCheck={openCheckModal}
       />
 
       <QueueTable
-        title="Finish Order"
-        description={`Order dengan status Confirmed / Checked untuk ${formatFilterLabel(selectedFilter)}.`}
+        title="Finish Receiving"
+        description={`Order dengan status Checked untuk ${formatFilterLabel(selectedFilter)}.`}
         rows={finishedOrders}
-        showDelivery
-        onConfirm={undefined}
+        showReceived
+        onCheck={undefined}
       />
 
       {selectedOrder ? (
-        <ConfirmDeliveryModal
+        <CheckReceivingModal
           order={selectedOrder}
-          deliveryNote={deliveryNote}
-          remarksDelivery={remarksDelivery}
-          confirmValues={confirmValues}
+          receivedValues={receivedValues}
           formError={formError}
           saving={saving}
-          onDeliveryNoteChange={setDeliveryNote}
-          onRemarksDeliveryChange={setRemarksDelivery}
-          onQtyConfirmChange={(itemCode, qtyConfirm) =>
-            setConfirmValues((current) => ({ ...current, [itemCode]: qtyConfirm }))
+          onQtyReceivedChange={(itemCode, qtyReceived) =>
+            setReceivedValues((current) => ({ ...current, [itemCode]: qtyReceived }))
           }
-          onClose={closeConfirmModal}
-          onSubmit={handleConfirmSubmit}
+          onClose={closeCheckModal}
+          onSubmit={handleCheckSubmit}
         />
       ) : null}
 
@@ -218,14 +194,14 @@ function QueueTable({
   title,
   description,
   rows,
-  showDelivery,
-  onConfirm,
+  showReceived,
+  onCheck,
 }: {
   title: string;
   description: string;
-  rows: DeliveryQueueRow[];
-  showDelivery: boolean;
-  onConfirm?: ((order: DeliveryQueueRow) => void) | undefined;
+  rows: ReceivingQueueRow[];
+  showReceived: boolean;
+  onCheck?: ((order: ReceivingQueueRow) => void) | undefined;
 }) {
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white/95 shadow-sm">
@@ -261,20 +237,28 @@ function QueueTable({
                     {column.orderLabel}
                   </th>
                 ))}
-                {showDelivery
+                {metricColumns.map((column) => (
+                  <th
+                    key={`${column.key}-delivery`}
+                    className="border-b border-slate-200 px-4 py-3 text-right font-semibold whitespace-nowrap"
+                  >
+                    {column.deliveryLabel}
+                  </th>
+                ))}
+                {showReceived
                   ? metricColumns.map((column) => (
                       <th
-                        key={`${column.key}-delivery`}
+                        key={`${column.key}-received`}
                         className="border-b border-slate-200 px-4 py-3 text-right font-semibold whitespace-nowrap"
                       >
-                        {column.deliveryLabel}
+                        {column.receivedLabel}
                       </th>
                     ))
                   : null}
                 <th className="border-b border-slate-200 px-4 py-3 text-left font-semibold whitespace-nowrap">
-                  Remarks Ordering
+                  Remarks Delivery
                 </th>
-                {onConfirm ? (
+                {onCheck ? (
                   <th className="border-b border-slate-200 px-4 py-3 text-left font-semibold whitespace-nowrap">
                     Action
                   </th>
@@ -293,23 +277,29 @@ function QueueTable({
                   {metricColumns.map((column) => (
                     <NumericCell key={`${row.orderId}-${column.key}-order`} value={row[column.key].order} />
                   ))}
-                  {showDelivery
+                  {metricColumns.map((column) => (
+                    <NumericCell
+                      key={`${row.orderId}-${column.key}-delivery`}
+                      value={row[column.key].delivery}
+                    />
+                  ))}
+                  {showReceived
                     ? metricColumns.map((column) => (
                         <NumericCell
-                          key={`${row.orderId}-${column.key}-delivery`}
-                          value={row[column.key].delivery}
+                          key={`${row.orderId}-${column.key}-received`}
+                          value={row[column.key].received ?? 0}
                         />
                       ))
                     : null}
-                  <RemarksCell value={row.remarksOrdering} />
-                  {onConfirm ? (
+                  <RemarksCell value={row.remarksDelivery} />
+                  {onCheck ? (
                     <td className="border-b border-slate-200 px-4 py-3 whitespace-nowrap">
                       <button
                         type="button"
-                        onClick={() => onConfirm(row)}
+                        onClick={() => onCheck(row)}
                         className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-slate-700"
                       >
-                        Konfirmasi
+                        Check
                       </button>
                     </td>
                   ) : null}
@@ -323,28 +313,20 @@ function QueueTable({
   );
 }
 
-function ConfirmDeliveryModal({
+function CheckReceivingModal({
   order,
-  deliveryNote,
-  remarksDelivery,
-  confirmValues,
+  receivedValues,
   formError,
   saving,
-  onDeliveryNoteChange,
-  onRemarksDeliveryChange,
-  onQtyConfirmChange,
+  onQtyReceivedChange,
   onClose,
   onSubmit,
 }: {
-  order: DeliveryQueueRow;
-  deliveryNote: string;
-  remarksDelivery: string;
-  confirmValues: Record<string, string>;
+  order: ReceivingQueueRow;
+  receivedValues: Record<string, string>;
   formError: string;
   saving: boolean;
-  onDeliveryNoteChange: (value: string) => void;
-  onRemarksDeliveryChange: (value: string) => void;
-  onQtyConfirmChange: (itemCode: string, qtyConfirm: string) => void;
+  onQtyReceivedChange: (itemCode: string, qtyReceived: string) => void;
   onClose: () => void;
   onSubmit: () => void;
 }) {
@@ -353,10 +335,10 @@ function ConfirmDeliveryModal({
       <div className="max-h-[90vh] w-full max-w-5xl overflow-y-auto rounded-3xl border border-slate-200 bg-white shadow-2xl">
         <div className="flex items-start justify-between border-b border-slate-200 px-6 py-5">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-700">
-              Delivery Confirmation
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-700">
+              Receiving Check
             </p>
-            <h2 className="mt-2 text-2xl font-bold text-slate-900">Konfirmasi Order</h2>
+            <h2 className="mt-2 text-2xl font-bold text-slate-900">Check Receiving Order</h2>
           </div>
           <button
             type="button"
@@ -386,6 +368,7 @@ function ConfirmDeliveryModal({
                   <th className="border-b border-slate-200 px-4 py-3 text-left font-semibold">Item Name</th>
                   <th className="border-b border-slate-200 px-4 py-3 text-right font-semibold">Qty Order</th>
                   <th className="border-b border-slate-200 px-4 py-3 text-right font-semibold">Qty Confirm</th>
+                  <th className="border-b border-slate-200 px-4 py-3 text-right font-semibold">Qty Received</th>
                 </tr>
               </thead>
               <tbody>
@@ -396,13 +379,16 @@ function ConfirmDeliveryModal({
                     <td className="border-b border-slate-200 px-4 py-3 text-right text-slate-700">
                       {formatNumber(item.qtyOrder)}
                     </td>
+                    <td className="border-b border-slate-200 px-4 py-3 text-right text-slate-700">
+                      {formatNumber(item.qtyConfirm)}
+                    </td>
                     <td className="border-b border-slate-200 px-4 py-3 text-right">
                       <input
                         type="number"
                         min={0}
                         inputMode="numeric"
-                        value={confirmValues[item.itemCode] ?? ""}
-                        onChange={(event) => onQtyConfirmChange(item.itemCode, event.target.value)}
+                        value={receivedValues[item.itemCode] ?? ""}
+                        onChange={(event) => onQtyReceivedChange(item.itemCode, event.target.value)}
                         className="ml-auto block h-11 w-28 rounded-xl border border-slate-300 px-3 text-right text-sm text-slate-700 outline-none transition focus:border-sky-500"
                       />
                     </td>
@@ -410,27 +396,6 @@ function ConfirmDeliveryModal({
                 ))}
               </tbody>
             </table>
-          </div>
-
-          <div className="grid gap-4 lg:grid-cols-2">
-            <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">Delivery Note (DN)</label>
-              <input
-                type="text"
-                value={deliveryNote}
-                onChange={(event) => onDeliveryNoteChange(event.target.value)}
-                className="h-11 w-full rounded-xl border border-slate-300 px-3 text-sm text-slate-700 outline-none transition focus:border-sky-500"
-              />
-            </div>
-
-            <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">Remarks Delivery</label>
-              <textarea
-                value={remarksDelivery}
-                onChange={(event) => onRemarksDeliveryChange(event.target.value)}
-                className="min-h-28 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-sky-500"
-              />
-            </div>
           </div>
 
           {formError ? (
@@ -455,7 +420,7 @@ function ConfirmDeliveryModal({
             disabled={saving}
             className="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:opacity-60"
           >
-            {saving ? "Menyimpan..." : "Konfirmasi Order"}
+            {saving ? "Menyimpan..." : "Check Order"}
           </button>
         </div>
       </div>
@@ -472,7 +437,7 @@ function MetaField({ label, value }: { label: string; value: string }) {
   );
 }
 
-const baseColumns: Array<{ key: keyof DeliveryQueueRow; label: string; align?: "left" | "right" }> = [
+const baseColumns: Array<{ key: keyof ReceivingQueueRow; label: string; align?: "left" | "right" }> = [
   { key: "kodeOrder", label: "Kode Order" },
   { key: "tanggalOrder", label: "Tanggal Order" },
   { key: "shift", label: "Shift" },
@@ -482,34 +447,35 @@ const baseColumns: Array<{ key: keyof DeliveryQueueRow; label: string; align?: "
 ];
 
 const metricColumns: Array<{
-  key: DeliveryMetricKey;
+  key: ReceivingMetricKey;
   orderLabel: string;
   deliveryLabel: string;
+  receivedLabel: string;
 }> = [
-  { key: "cb1tr", orderLabel: "Ord CB 1TR", deliveryLabel: "Delv CB 1TR" },
-  { key: "cb2tr", orderLabel: "Ord CB 2TR", deliveryLabel: "Delv CB 2TR" },
-  { key: "camNo01", orderLabel: "Ord CA 01", deliveryLabel: "Delv CA 01" },
-  { key: "camNo02", orderLabel: "Ord CA 02", deliveryLabel: "Delv CA 02" },
-  { key: "cr1tr", orderLabel: "Ord CR 1TR", deliveryLabel: "Delv CR 1TR" },
+  { key: "cb1tr", orderLabel: "Ord CB 1TR", deliveryLabel: "Delv CB 1TR", receivedLabel: "Recv CB 1TR" },
+  { key: "cb2tr", orderLabel: "Ord CB 2TR", deliveryLabel: "Delv CB 2TR", receivedLabel: "Recv CB 2TR" },
+  { key: "camNo01", orderLabel: "Ord CA 01", deliveryLabel: "Delv CA 01", receivedLabel: "Recv CA 01" },
+  { key: "camNo02", orderLabel: "Ord CA 02", deliveryLabel: "Delv CA 02", receivedLabel: "Recv CA 02" },
+  { key: "cr1tr", orderLabel: "Ord CR 1TR", deliveryLabel: "Delv CR 1TR", receivedLabel: "Recv CR 1TR" },
 ];
 
 function SummaryCard({
   label,
-  totalOrder,
-  totalDelivery,
+  totalConfirmed,
+  totalReceived,
   gap,
 }: {
   label: string;
-  totalOrder: number;
-  totalDelivery: number;
+  totalConfirmed: number;
+  totalReceived: number;
   gap: number;
 }) {
   return (
     <article className="rounded-2xl border border-slate-200 bg-white/95 p-5 shadow-sm">
       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{label}</p>
       <div className="mt-4 space-y-3">
-        <MetricRow label="Total Order" value={totalOrder} />
-        <MetricRow label="Total Delivery" value={totalDelivery} />
+        <MetricRow label="Total Confirm" value={totalConfirmed} />
+        <MetricRow label="Total Received" value={totalReceived} />
         <MetricRow
           label="Gap"
           value={gap}

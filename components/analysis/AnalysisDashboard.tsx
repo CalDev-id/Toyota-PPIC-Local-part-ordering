@@ -1,5 +1,6 @@
 "use client";
 
+import AutoSubmitReportFilters from "@/components/shared/AutoSubmitReportFilters";
 import type {
   AnalysisDashboardData,
   AnalysisFilter,
@@ -33,45 +34,11 @@ export default function AnalysisDashboard({
             </p>
           </div>
 
-          <form className="grid gap-3 sm:grid-cols-3 xl:min-w-[620px]" method="get">
-            <FilterField label="Tanggal">
-              <SelectField name="date" defaultValue={selectedFilter.date}>
-                {filterOptions.dates.map((date) => (
-                  <option key={date} value={date}>
-                    {formatDateOption(date)}
-                  </option>
-                ))}
-              </SelectField>
-            </FilterField>
-
-            <FilterField label="Shift">
-              <SelectField name="shift" defaultValue={selectedFilter.shift}>
-                {filterOptions.shifts.map((shift) => (
-                  <option key={shift} value={shift}>
-                    {shift}
-                  </option>
-                ))}
-              </SelectField>
-            </FilterField>
-
-            <FilterField label="Day / Night">
-              <div className="flex gap-2">
-                <SelectField name="dayNight" defaultValue={selectedFilter.dayNight}>
-                  {filterOptions.dayNights.map((dayNight) => (
-                    <option key={dayNight} value={dayNight}>
-                      {dayNight}
-                    </option>
-                  ))}
-                </SelectField>
-                <button
-                  type="submit"
-                  className="inline-flex h-11 items-center justify-center rounded-xl bg-slate-900 px-4 text-sm font-semibold text-white transition hover:bg-slate-700"
-                >
-                  Terapkan
-                </button>
-              </div>
-            </FilterField>
-          </form>
+          <AutoSubmitReportFilters
+            selectedFilter={selectedFilter}
+            filterOptions={filterOptions}
+            className="grid gap-3 sm:grid-cols-3 xl:min-w-[620px]"
+          />
         </div>
       </div>
 
@@ -81,17 +48,23 @@ export default function AnalysisDashboard({
         </div>
       ) : null}
 
-      <RequestConfirmedCircleChart
+      {/* <RequestConfirmedCircleChart
         title="Request vs Confirmed"
         subtitle={`Per item total untuk ${selectedFilter.shift} / ${selectedFilter.dayNight} pada ${formatDateOption(selectedFilter.date)}.`}
         data={data.requestVsConfirmedPerItem}
+      /> */}
+
+      <PlanRequestConfirmedChart
+        title="Plan vs Request vs Confirmed"
+        subtitle={`Bandingkan target plan dengan request aktual dan qty confirmed per item untuk ${selectedFilter.shift} / ${selectedFilter.dayNight} pada ${formatDateOption(selectedFilter.date)}.`}
+        data={data.requestVsConfirmedPerItem}
       />
 
-      <DailyVolumeChart
+      {/* <DailyVolumeChart
         title="Tren Request dan Delivery Harian"
         subtitle={`Total request dan total delivery untuk 14 hari hingga ${formatDateOption(selectedFilter.date)}.`}
         data={data.volumeOrderHarian}
-      />
+      /> */}
     </section>
   );
 }
@@ -266,47 +239,108 @@ function RequestConfirmedCircleCard({ item }: { item: ItemMetricPoint }) {
   );
 }
 
-function FilterField({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className="block">
-      <span className="mb-1 block text-sm font-medium text-slate-700">{label}</span>
-      {children}
-    </label>
-  );
-}
-
-function SelectField({
-  name,
-  defaultValue,
-  children,
+function PlanRequestConfirmedChart({
+  title,
+  subtitle,
+  data,
 }: {
-  name: string;
-  defaultValue: string;
-  children: React.ReactNode;
+  title: string;
+  subtitle: string;
+  data: ItemMetricPoint[];
 }) {
-  return (
-    <div className="relative">
-      <select
-        name={name}
-        defaultValue={defaultValue}
-        className="h-11 w-full appearance-none rounded-xl border border-slate-300 bg-white px-3 pr-12 text-sm outline-none transition focus:border-sky-500"
-      >
-        {children}
-      </select>
-      <span className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-slate-400">
-        <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8">
-          <path d="m5 7.5 5 5 5-5" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      </span>
-    </div>
-  );
-}
+  const width = 1120;
+  const height = 360;
+  const chartLeft = 52;
+  const chartBottom = 270;
+  const chartTop = 28;
+  const chartRight = 24;
+  const maxValue = Math.max(...data.flatMap((item) => [item.plan, item.request, item.confirmed]), 1);
+  const chartHeight = chartBottom - chartTop;
+  const availableWidth = width - chartLeft - chartRight;
+  const groupWidth = availableWidth / Math.max(data.length, 1);
+  const barWidth = Math.min(18, Math.max(groupWidth / 5, 10));
 
-function BarTrack({ value, max, className }: { value: number; max: number; className: string }) {
   return (
-    <div className="h-3 overflow-hidden rounded-full bg-slate-100">
-      <div className={`h-full rounded-full ${className}`} style={{ width: `${(value / max) * 100}%` }} />
-    </div>
+    <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <header className="mb-4">
+        <h3 className="text-base font-semibold text-slate-900">{title}</h3>
+        <p className="text-sm text-slate-500">{subtitle}</p>
+      </header>
+
+      <div className="overflow-x-auto">
+        <svg viewBox={`0 0 ${width} ${height}`} className="h-[24rem] w-full min-w-[1040px]">
+          <line x1={chartLeft} y1={chartBottom} x2={width - chartRight} y2={chartBottom} className="stroke-slate-200" />
+          <line x1={chartLeft} y1={chartTop} x2={chartLeft} y2={chartBottom} className="stroke-slate-200" />
+
+          {[0, 0.25, 0.5, 0.75, 1].map((tick) => {
+            const y = chartBottom - chartHeight * tick;
+            const value = Math.round(maxValue * tick);
+            return (
+              <g key={tick}>
+                <line x1={chartLeft} y1={y} x2={width - chartRight} y2={y} className="stroke-slate-100" />
+                <text x={chartLeft - 10} y={y + 4} textAnchor="end" className="fill-slate-400 text-[12px]">
+                  {value}
+                </text>
+              </g>
+            );
+          })}
+
+          {data.map((item, index) => {
+            const baseX = chartLeft + index * groupWidth + groupWidth / 2;
+            const planHeight = (item.plan / maxValue) * chartHeight;
+            const requestHeight = (item.request / maxValue) * chartHeight;
+            const confirmedHeight = (item.confirmed / maxValue) * chartHeight;
+
+            return (
+              <g key={item.key}>
+                <rect
+                  x={baseX - barWidth * 1.5 - 6}
+                  y={chartBottom - planHeight}
+                  width={barWidth}
+                  height={Math.max(planHeight, 2)}
+                  rx="6"
+                  className="fill-slate-400"
+                />
+                <rect
+                  x={baseX - barWidth / 2}
+                  y={chartBottom - requestHeight}
+                  width={barWidth}
+                  height={Math.max(requestHeight, 2)}
+                  rx="6"
+                  className="fill-sky-500"
+                />
+                <rect
+                  x={baseX + barWidth / 2 + 6}
+                  y={chartBottom - confirmedHeight}
+                  width={barWidth}
+                  height={Math.max(confirmedHeight, 2)}
+                  rx="6"
+                  className="fill-emerald-500"
+                />
+
+                <text x={baseX} y={304} textAnchor="middle" className="fill-slate-600 text-[12px] font-medium">
+                  {item.label}
+                </text>
+                <text
+                  x={baseX}
+                  y={326}
+                  textAnchor="middle"
+                  className={`text-[11px] font-semibold ${item.gap > 0 ? "fill-amber-600" : "fill-emerald-600"}`}
+                >
+                  Gap {formatNumber(item.gap)}
+                </text>
+              </g>
+            );
+          })}
+        </svg>
+      </div>
+
+      <div className="mt-3 flex flex-wrap gap-4 text-xs text-slate-600">
+        <LegendDot className="bg-slate-400" label="Plan" />
+        <LegendDot className="bg-sky-500" label="Request" />
+        <LegendDot className="bg-emerald-500" label="Confirmed" />
+      </div>
+    </article>
   );
 }
 

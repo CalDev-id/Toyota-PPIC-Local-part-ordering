@@ -1,5 +1,9 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## Manual Testing
+
+Manual/UAT test cases for the Toyota ordering flow are documented in [docs/manual-uat-ordering-flow.md](docs/manual-uat-ordering-flow.md).
+
 ## Getting Started
 
 First, run the development server:

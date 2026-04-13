@@ -10,15 +10,13 @@ type RouteContext = {
   }>;
 };
 
-type ConfirmDeliveryPayload = {
-  deliveryNote?: unknown;
-  remarksDelivery?: unknown;
+type CheckReceivingPayload = {
   items?: unknown;
 };
 
-type ConfirmDeliveryItem = {
+type CheckReceivingItem = {
   itemCode: string;
-  qtyConfirm: number;
+  qtyReceived: number;
 };
 
 export async function PUT(req: Request, context: RouteContext) {
@@ -29,15 +27,12 @@ export async function PUT(req: Request, context: RouteContext) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    if (session.user.role !== "DELIVERY" && session.user.role !== "ADMIN") {
+    if (session.user.role !== "RECEIVING" && session.user.role !== "ADMIN") {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     const { id } = await context.params;
-    const payload = (await req.json()) as ConfirmDeliveryPayload;
-
-    const deliveryNote = normalizeRequiredText(payload.deliveryNote, "Delivery Note wajib diisi");
-    const remarksDelivery = normalizeRequiredText(payload.remarksDelivery, "Remarks delivery wajib diisi");
+    const payload = (await req.json()) as CheckReceivingPayload;
     const items = normalizeItems(payload.items);
 
     const order = await prisma.orderHeader.findUnique({
@@ -65,9 +60,7 @@ export async function PUT(req: Request, context: RouteContext) {
       prisma.orderHeader.update({
         where: { orderId: id },
         data: {
-          statusOrder: "Confirmed",
-          deliveryNote,
-          remarksDelivery,
+          statusOrder: "Checked",
           updatedBy: userLabel,
           updatedAt: now,
         },
@@ -76,7 +69,7 @@ export async function PUT(req: Request, context: RouteContext) {
         prisma.orderDetail.update({
           where: { detailId: detailIdsByCode.get(item.itemCode)! },
           data: {
-            qtyConfirm: item.qtyConfirm,
+            qtyReceived: item.qtyReceived,
             updatedAt: now,
           },
         })
@@ -84,12 +77,12 @@ export async function PUT(req: Request, context: RouteContext) {
     ]);
 
     await createRoleNotification({
-      type: "DELIVERY_CONFIRMED",
-      title: "Delivery dikonfirmasi",
-      message: `Order ${order.kodeOrder} sudah dikonfirmasi Delivery`,
+      type: "RECEIVING_CHECKED",
+      title: "Receiving selesai",
+      message: `Order ${order.kodeOrder} sudah selesai di-check Receiving`,
       kodeOrder: order.kodeOrder,
       orderId: order.orderId,
-      targetRole: "RECEIVING",
+      targetRole: "ORDERING",
     });
 
     return NextResponse.json({ success: true });
@@ -100,40 +93,30 @@ export async function PUT(req: Request, context: RouteContext) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
-    return NextResponse.json({ error: "Gagal mengonfirmasi delivery order" }, { status: 500 });
+    return NextResponse.json({ error: "Gagal menyimpan receiving order" }, { status: 500 });
   }
 }
 
-function normalizeRequiredText(value: unknown, errorMessage: string) {
-  const text = typeof value === "string" ? value.trim() : "";
-
-  if (!text) {
-    throw new Error(errorMessage);
-  }
-
-  return text;
-}
-
-function normalizeItems(value: unknown): ConfirmDeliveryItem[] {
+function normalizeItems(value: unknown): CheckReceivingItem[] {
   if (!Array.isArray(value) || value.length === 0) {
-    throw new Error("Item delivery wajib diisi");
+    throw new Error("Item receiving wajib diisi");
   }
 
   return value.map((item, index) => {
     const itemCode = typeof item?.itemCode === "string" ? item.itemCode.trim().toUpperCase() : "";
-    const qtyConfirm = Number(item?.qtyConfirm);
+    const qtyReceived = Number(item?.qtyReceived);
 
     if (!itemCode) {
       throw new Error(`Item code pada baris ${index + 1} wajib diisi`);
     }
 
-    if (!Number.isFinite(qtyConfirm) || qtyConfirm < 0) {
-      throw new Error(`Qty confirm pada ${itemCode} tidak valid`);
+    if (!Number.isFinite(qtyReceived) || qtyReceived < 0) {
+      throw new Error(`Qty received pada ${itemCode} tidak valid`);
     }
 
     return {
       itemCode,
-      qtyConfirm,
+      qtyReceived,
     };
   });
 }

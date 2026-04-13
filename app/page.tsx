@@ -1,5 +1,4 @@
 import DefaultLayout from "@/components/Layout/DefaultLayout";
-import { requireSession } from "@/lib/session";
 import Link from "next/link";
 
 type ShortcutItem = {
@@ -15,6 +14,12 @@ const shortcutItems: ShortcutItem[] = [
     description: "Pantau tren request, delivery, dan request vs confirmed dari satu dashboard.",
     href: "/analysis",
     accent: "from-indigo-500 to-sky-500",
+  },
+  {
+    title: "Tracking",
+    description: "Pantau progress order dari submitted, confirmed, sampai checked per tanggal, shift, dan day/night.",
+    href: "/tracking",
+    accent: "from-sky-500 to-emerald-500",
   },
   {
     title: "Planning",
@@ -36,16 +41,16 @@ const shortcutItems: ShortcutItem[] = [
   },
   {
     title: "Receiving",
-    description: "Lanjutkan proses receiving untuk order yang sudah dikonfirmasi delivery.",
+    description: "Input qty received untuk order confirmed dan selesaikan flow menjadi checked.",
     href: "/receiving",
     accent: "from-cyan-500 to-blue-500",
   },
-  {
-    title: "Users",
-    description: "Kelola akun, role, dan akses user dashboard.",
-    href: "/users",
-    accent: "from-rose-500 to-pink-500",
-  },
+  // {
+  //   title: "Users",
+  //   description: "Kelola akun, role, dan akses user dashboard.",
+  //   href: "/users",
+  //   accent: "from-rose-500 to-pink-500",
+  // },
 ];
 
 export default async function Home() {
@@ -97,7 +102,7 @@ export default async function Home() {
           </div>
         </section>
 
-        <section className="rounded-2xl border border-slate-200 bg-white/95 p-6 shadow-sm">
+        {/* <section className="rounded-2xl border border-slate-200 bg-white/95 p-6 shadow-sm">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Workflow</p>
           <h2 className="mt-2 text-xl font-bold text-slate-900">Urutan Operasional</h2>
 
@@ -105,37 +110,10 @@ export default async function Home() {
             <WorkflowStep step="01" title="Planning" description="Set stock awal dan plan produksi harian." accent="bg-emerald-500" />
             <WorkflowStep step="02" title="Ordering" description="Buat order berdasarkan planning dan kebutuhan aktual." accent="bg-slate-900" />
             <WorkflowStep step="03" title="Delivery" description="Konfirmasi quantity yang benar-benar dikirim." accent="bg-amber-500" />
-            <WorkflowStep step="04" title="Receiving" description="Lanjutkan validasi penerimaan barang." accent="bg-sky-500" />
+            <WorkflowStep step="04" title="Receiving" description="Input qty received dan ubah status order menjadi checked." accent="bg-sky-500" />
           </div>
-        </section>
+        </section> */}
       </section>
     </DefaultLayout>
-  );
-}
-
-function WorkflowStep({
-  step,
-  title,
-  description,
-  accent,
-}: {
-  step: string;
-  title: string;
-  description: string;
-  accent: string;
-}) {
-  return (
-    <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-b from-white to-slate-50 p-5">
-      <div className={`absolute left-0 top-0 h-1.5 w-full ${accent}`} />
-      <div className="flex items-start gap-4">
-        <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-sm font-bold text-white ${accent}`}>
-          {step}
-        </div>
-        <div>
-          <p className="text-base font-semibold text-slate-900">{title}</p>
-          <p className="mt-2 text-sm leading-6 text-slate-600">{description}</p>
-        </div>
-      </div>
-    </div>
   );
 }
