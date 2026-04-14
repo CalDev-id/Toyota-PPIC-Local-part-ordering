@@ -11,6 +11,29 @@ import type {
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
+type ShellStatus = "idle" | "active" | "blocked";
+type ShellSectionKey = "CB_1TR" | "CB_2TR";
+
+type ShellItem = {
+  code: string;
+  groupNumber: number;
+  section: ShellSectionKey;
+};
+
+type ShellStatusMap = Record<string, ShellStatus>;
+
+const SHELL_SECTIONS: Record<ShellSectionKey, ShellItem[]> = {
+  CB_1TR: buildShellItems("CB_1TR", 1, 3),
+  CB_2TR: buildShellItems("CB_2TR", 4, 12),
+};
+
+const ALL_SHELLS = [...SHELL_SECTIONS.CB_1TR, ...SHELL_SECTIONS.CB_2TR];
+
+const EMPTY_SHELL_STATUSES: ShellStatusMap = ALL_SHELLS.reduce<ShellStatusMap>((accumulator, shell) => {
+  accumulator[shell.code] = "idle";
+  return accumulator;
+}, {});
+
 type DeliveryReportProps = {
   activeOrders: DeliveryQueueRow[];
   finishedOrders: DeliveryQueueRow[];
@@ -33,6 +56,7 @@ export default function DeliveryReport({
   const [deliveryNote, setDeliveryNote] = useState("");
   const [remarksDelivery, setRemarksDelivery] = useState("");
   const [confirmValues, setConfirmValues] = useState<Record<string, string>>({});
+  const [shellStatuses, setShellStatuses] = useState<ShellStatusMap>(EMPTY_SHELL_STATUSES);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
   const [toastMessage, setToastMessage] = useState("");
@@ -53,6 +77,7 @@ export default function DeliveryReport({
     setConfirmValues(
       Object.fromEntries(order.items.map((item) => [item.itemCode, ""]))
     );
+    setShellStatuses(buildInitialShellStatuses(order));
     setFormError("");
   }
 
@@ -65,6 +90,7 @@ export default function DeliveryReport({
     setDeliveryNote("");
     setRemarksDelivery("");
     setConfirmValues({});
+    setShellStatuses(EMPTY_SHELL_STATUSES);
     setFormError("");
   }
 
@@ -110,6 +136,15 @@ export default function DeliveryReport({
             itemCode: item.itemCode,
             qtyConfirm: Number(confirmValues[item.itemCode] ?? "") || 0,
           })),
+          selected_shells:
+            selectedOrder.truckType === "JUNBIKI"
+              ? ALL_SHELLS.map((shell) => ({
+                  code: shell.code,
+                  section: shell.section,
+                  status: shellStatuses[shell.code] ?? "idle",
+                  groupNumber: shell.groupNumber,
+                }))
+              : undefined,
         }),
       });
       const data = await res.json();
@@ -192,10 +227,17 @@ export default function DeliveryReport({
           confirmValues={confirmValues}
           formError={formError}
           saving={saving}
+          shellStatuses={shellStatuses}
           onDeliveryNoteChange={setDeliveryNote}
           onRemarksDeliveryChange={setRemarksDelivery}
           onQtyConfirmChange={(itemCode, qtyConfirm) =>
             setConfirmValues((current) => ({ ...current, [itemCode]: qtyConfirm }))
+          }
+          onToggleShell={(shell) =>
+            setShellStatuses((current) => ({
+              ...current,
+              [shell.code]: getNextShellStatus(current[shell.code] ?? "idle"),
+            }))
           }
           onClose={closeConfirmModal}
           onSubmit={handleConfirmSubmit}
@@ -330,9 +372,11 @@ function ConfirmDeliveryModal({
   confirmValues,
   formError,
   saving,
+  shellStatuses,
   onDeliveryNoteChange,
   onRemarksDeliveryChange,
   onQtyConfirmChange,
+  onToggleShell,
   onClose,
   onSubmit,
 }: {
@@ -342,15 +386,17 @@ function ConfirmDeliveryModal({
   confirmValues: Record<string, string>;
   formError: string;
   saving: boolean;
+  shellStatuses: ShellStatusMap;
   onDeliveryNoteChange: (value: string) => void;
   onRemarksDeliveryChange: (value: string) => void;
   onQtyConfirmChange: (itemCode: string, qtyConfirm: string) => void;
+  onToggleShell: (shell: ShellItem) => void;
   onClose: () => void;
   onSubmit: () => void;
 }) {
   return (
     <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-950/45 px-4 py-6">
-      <div className="max-h-[90vh] w-full max-w-5xl overflow-y-auto rounded-3xl border border-slate-200 bg-white shadow-2xl">
+      <div className="max-h-[90vh] w-full max-w-[88vw] overflow-y-auto rounded-3xl border border-slate-200 bg-white shadow-2xl">
         <div className="flex items-start justify-between border-b border-slate-200 px-6 py-5">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-700">
@@ -368,7 +414,7 @@ function ConfirmDeliveryModal({
           </button>
         </div>
 
-        <div className="space-y-5 px-6 py-5">
+        <div className="space-y-5 px-6 py-6">
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             <MetaField label="Tanggal" value={order.tanggalOrder} />
             <MetaField label="Kode Order" value={order.kodeOrder} />
@@ -377,6 +423,23 @@ function ConfirmDeliveryModal({
             <MetaField label="Truck Type" value={order.truckType} />
             <MetaField label="Ritase" value={formatNumber(order.ritaseRequest)} />
           </div>
+
+          {order.truckType === "JUNBIKI" ? (
+            <div className="grid gap-5 xl:grid-cols-[minmax(280px,0.75fr)_minmax(0,1.65fr)]">
+              <ShellGridSection
+                section="CB_1TR"
+                shells={SHELL_SECTIONS.CB_1TR}
+                shellStatuses={shellStatuses}
+                onToggleShell={onToggleShell}
+              />
+              <ShellGridSection
+                section="CB_2TR"
+                shells={SHELL_SECTIONS.CB_2TR}
+                shellStatuses={shellStatuses}
+                onToggleShell={onToggleShell}
+              />
+            </div>
+          ) : null}
 
           <div className="overflow-hidden rounded-2xl border border-slate-200">
             <table className="min-w-full border-collapse text-sm">
@@ -472,6 +535,59 @@ function MetaField({ label, value }: { label: string; value: string }) {
   );
 }
 
+function ShellGridSection({
+  section,
+  shells,
+  shellStatuses,
+  onToggleShell,
+}: {
+  section: ShellSectionKey;
+  shells: ShellItem[];
+  shellStatuses: ShellStatusMap;
+  onToggleShell: (shell: ShellItem) => void;
+}) {
+  const groupedShells = groupShellsByLetter(shells);
+
+  return (
+    <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="flex items-center gap-3">
+        <h3 className="text-lg font-bold text-slate-900">{section === "CB_1TR" ? "Shell CB 1TR" : "Shell CB 2TR"}</h3>
+      </div>
+
+      <div className="mt-5 space-y-4">
+        {groupedShells.map((row) => (
+          <div key={row.key}>
+            <div className={`grid gap-3 ${section === "CB_1TR" ? "grid-cols-3" : "grid-cols-3 lg:grid-cols-5 xl:grid-cols-9"}`}>
+              {row.items.map((shell) => (
+                <button
+                  key={shell.code}
+                  type="button"
+                  onClick={() => onToggleShell(shell)}
+                  className={`rounded-2xl border px-3 py-4 text-center text-sm font-semibold shadow-sm transition ${
+                    getShellStatusClassName(shellStatuses[shell.code] ?? "idle")
+                  }`}
+                >
+                  <span className="block text-base font-bold">{shell.code}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-5 flex flex-wrap gap-2 text-xs font-medium">
+        <LegendBadge label="Idle" className="border-slate-200 bg-slate-100 text-slate-600" />
+        <LegendBadge label="Active / OK" className="border-emerald-200 bg-emerald-50 text-emerald-700" />
+        <LegendBadge label="Blocked / Reject" className="border-rose-200 bg-rose-50 text-rose-700" />
+      </div>
+    </section>
+  );
+}
+
+function LegendBadge({ label, className }: { label: string; className: string }) {
+  return <span className={`rounded-full border px-2.5 py-1 ${className}`}>{label}</span>;
+}
+
 const baseColumns: Array<{ key: keyof DeliveryQueueRow; label: string; align?: "left" | "right" }> = [
   { key: "kodeOrder", label: "Kode Order" },
   { key: "tanggalOrder", label: "Tanggal Order" },
@@ -518,6 +634,70 @@ function SummaryCard({
       </div>
     </article>
   );
+}
+
+function buildInitialShellStatuses(order: DeliveryQueueRow): ShellStatusMap {
+  const next = { ...EMPTY_SHELL_STATUSES };
+
+  for (const shell of [...order.shellStateCb1tr, ...order.shellStateCb2tr]) {
+    next[shell.code] = shell.status;
+  }
+
+  return next;
+}
+
+function buildShellItems(section: ShellSectionKey, startGroup: number, endGroup: number) {
+  const variants = ["C", "B", "A"];
+  const items: ShellItem[] = [];
+
+  for (let groupNumber = startGroup; groupNumber <= endGroup; groupNumber += 1) {
+    for (const variant of variants) {
+      items.push({
+        code: `${groupNumber}${variant}`,
+        groupNumber,
+        section,
+      });
+    }
+  }
+
+  return items;
+}
+
+function groupShellsByLetter(shells: ShellItem[]) {
+  const rows = [
+    { key: "Row C", variant: "C" },
+    { key: "Row B", variant: "B" },
+    { key: "Row A", variant: "A" },
+  ];
+
+  return rows.map((row) => ({
+    key: row.key,
+    items: shells.filter((shell) => shell.code.endsWith(row.variant)),
+  }));
+}
+
+function getNextShellStatus(currentStatus: ShellStatus): ShellStatus {
+  if (currentStatus === "idle") {
+    return "active";
+  }
+
+  if (currentStatus === "active") {
+    return "blocked";
+  }
+
+  return "idle";
+}
+
+function getShellStatusClassName(status: ShellStatus) {
+  if (status === "active") {
+    return "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100";
+  }
+
+  if (status === "blocked") {
+    return "border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100";
+  }
+
+  return "border-slate-200 bg-slate-100 text-slate-700 hover:bg-slate-200";
 }
 
 function MetricRow({

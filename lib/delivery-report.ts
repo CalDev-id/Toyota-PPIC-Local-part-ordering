@@ -35,6 +35,8 @@ export type DeliveryQueueRow = {
   deliveryNote: string;
   remarksOrdering: string;
   remarksDelivery: string;
+  shellStateCb1tr: DeliveryShellState[];
+  shellStateCb2tr: DeliveryShellState[];
   items: DeliveryOrderItem[];
   cb1tr: OrderMetricPair;
   cb2tr: OrderMetricPair;
@@ -43,6 +45,13 @@ export type DeliveryQueueRow = {
   cr1tr: OrderMetricPair;
   statusOrder: string;
   sortDateValue: number;
+};
+
+export type DeliveryShellState = {
+  code: string;
+  section: "CB_1TR" | "CB_2TR";
+  status: "active" | "blocked";
+  groupNumber: number;
 };
 
 export type DeliveryOrderItem = {
@@ -82,6 +91,8 @@ export async function getDeliveryPageData(filter: OrderingFilter): Promise<Deliv
       deliveryNote: true,
       remarksOrdering: true,
       remarksDelivery: true,
+      shellStateCb1tr: true,
+      shellStateCb2tr: true,
       statusOrder: true,
       waktuOrder: true,
       details: {
@@ -126,6 +137,8 @@ export async function getDeliveryPageData(filter: OrderingFilter): Promise<Deliv
       deliveryNote: normalizeText(header.deliveryNote),
       remarksOrdering: normalizeText(header.remarksOrdering),
       remarksDelivery: normalizeText(header.remarksDelivery),
+      shellStateCb1tr: parseShellState(header.shellStateCb1tr, "CB_1TR"),
+      shellStateCb2tr: parseShellState(header.shellStateCb2tr, "CB_2TR"),
       items: header.details.map((detail) => ({
         detailId: detail.detailId,
         itemCode: normalizeText(detail.itemCode),
@@ -198,6 +211,43 @@ function formatDateLabel(value: Date) {
   const month = MONTH_NAMES_SHORT[value.getUTCMonth()];
   const year = value.getUTCFullYear();
   return `${day} ${month} ${year}`;
+}
+
+function parseShellState(
+  value: string | null,
+  section: DeliveryShellState["section"]
+): DeliveryShellState[] {
+  if (!value) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(value);
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+
+    return parsed.flatMap((item) => {
+      if (typeof item !== "object" || item === null) {
+        return [];
+      }
+
+      const code = typeof item.code === "string" ? item.code.trim().toUpperCase() : "";
+      const status =
+        typeof item.status === "string" && ["active", "blocked"].includes(item.status.toLowerCase())
+          ? (item.status.toLowerCase() as DeliveryShellState["status"])
+          : null;
+      const groupNumber = typeof item.groupNumber === "number" ? item.groupNumber : Number(item.groupNumber ?? 0);
+
+      if (!code || !status || !Number.isFinite(groupNumber)) {
+        return [];
+      }
+
+      return [{ code, section, status, groupNumber }];
+    });
+  } catch {
+    return [];
+  }
 }
 
 const MONTH_NAMES_SHORT = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];

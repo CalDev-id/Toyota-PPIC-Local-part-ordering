@@ -14,11 +14,19 @@ type ConfirmDeliveryPayload = {
   deliveryNote?: unknown;
   remarksDelivery?: unknown;
   items?: unknown;
+  selected_shells?: unknown;
 };
 
 type ConfirmDeliveryItem = {
   itemCode: string;
   qtyConfirm: number;
+};
+
+type ConfirmDeliveryShell = {
+  code: string;
+  section: "CB_1TR" | "CB_2TR";
+  status: "idle" | "active" | "blocked";
+  groupNumber: number;
 };
 
 export async function PUT(req: Request, context: RouteContext) {
@@ -39,6 +47,7 @@ export async function PUT(req: Request, context: RouteContext) {
     const deliveryNote = normalizeRequiredText(payload.deliveryNote, "Delivery Note wajib diisi");
     const remarksDelivery = normalizeRequiredText(payload.remarksDelivery, "Remarks delivery wajib diisi");
     const items = normalizeItems(payload.items);
+    const selectedShells = normalizeShells(payload.selected_shells);
 
     const order = await prisma.orderHeader.findUnique({
       where: { orderId: id },
@@ -60,6 +69,8 @@ export async function PUT(req: Request, context: RouteContext) {
 
     const userLabel = session.user.name?.trim() || session.user.email || "SYSTEM";
     const now = new Date();
+    const cb1trShells = selectedShells.filter((shell) => shell.section === "CB_1TR" && shell.status !== "idle");
+    const cb2trShells = selectedShells.filter((shell) => shell.section === "CB_2TR" && shell.status !== "idle");
 
     await prisma.$transaction([
       prisma.orderHeader.update({
@@ -68,6 +79,8 @@ export async function PUT(req: Request, context: RouteContext) {
           statusOrder: "Confirmed",
           deliveryNote,
           remarksDelivery,
+          shellStateCb1tr: order.truckType === "JUNBIKI" ? JSON.stringify(cb1trShells) : order.shellStateCb1tr,
+          shellStateCb2tr: order.truckType === "JUNBIKI" ? JSON.stringify(cb2trShells) : order.shellStateCb2tr,
           updatedBy: userLabel,
           updatedAt: now,
         },
@@ -135,5 +148,34 @@ function normalizeItems(value: unknown): ConfirmDeliveryItem[] {
       itemCode,
       qtyConfirm,
     };
+  });
+}
+
+function normalizeShells(value: unknown): ConfirmDeliveryShell[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.flatMap((item) => {
+    if (typeof item !== "object" || item === null) {
+      return [];
+    }
+
+    const code = typeof item.code === "string" ? item.code.trim().toUpperCase() : "";
+    const section =
+      typeof item.section === "string" && ["CB_1TR", "CB_2TR"].includes(item.section.toUpperCase())
+        ? (item.section.toUpperCase() as ConfirmDeliveryShell["section"])
+        : null;
+    const status =
+      typeof item.status === "string" && ["idle", "active", "blocked"].includes(item.status.toLowerCase())
+        ? (item.status.toLowerCase() as ConfirmDeliveryShell["status"])
+        : null;
+    const groupNumber = typeof item.groupNumber === "number" ? item.groupNumber : Number(item.groupNumber ?? 0);
+
+    if (!code || !section || !status || !Number.isFinite(groupNumber)) {
+      return [];
+    }
+
+    return [{ code, section, status, groupNumber }];
   });
 }
