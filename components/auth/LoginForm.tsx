@@ -3,11 +3,16 @@
 import { signIn } from "next-auth/react"
 import { useState } from "react"
 
-export default function LoginForm() {
+type LoginFormProps = {
+  callbackUrl?: string
+}
+
+export default function LoginForm({ callbackUrl }: LoginFormProps) {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
+  const redirectTo = callbackUrl?.startsWith("/") && !callbackUrl.startsWith("//") ? callbackUrl : "/"
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -26,7 +31,7 @@ export default function LoginForm() {
       return
     }
 
-    window.location.href = "/"
+    window.location.href = redirectTo
   }
 
   return (

@@ -1,4 +1,5 @@
 import DefaultLayout from "@/components/Layout/DefaultLayout";
+import { requireSession } from "@/lib/session";
 import Link from "next/link";
 
 type ShortcutItem = {
@@ -54,6 +55,8 @@ const shortcutItems: ShortcutItem[] = [
 ];
 
 export default async function Home() {
+  await requireSession();
+
   return (
     <DefaultLayout>
       <section className="space-y-6">

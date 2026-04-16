@@ -132,7 +132,7 @@ export async function PUT(req: Request, context: RouteContext) {
         return NextResponse.json({ error: validationMessage }, { status: 400 });
       }
 
-      const itemsByCode = new Map(input.items.map((item) => [item.itemCode, item.qtyOrder]));
+      const itemsByCode = new Map<string, number>(input.items.map((item) => [item.itemCode, item.qtyOrder]));
 
       await prisma.$transaction([
         prisma.orderHeader.update({

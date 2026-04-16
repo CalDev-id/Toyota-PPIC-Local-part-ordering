@@ -4,8 +4,16 @@ import { getServerSession } from "next-auth"
 import Image from "next/image"
 import { redirect } from "next/navigation"
 
-export default async function LoginPage() {
+type LoginPageProps = {
+  searchParams?: Promise<{
+    callbackUrl?: string | string[]
+  }>
+}
+
+export default async function LoginPage({ searchParams }: LoginPageProps) {
   const session = await getServerSession(authOptions)
+  const params = await searchParams
+  const callbackUrl = Array.isArray(params?.callbackUrl) ? params?.callbackUrl[0] : params?.callbackUrl
 
   if (session?.user) {
     redirect("/")
@@ -31,7 +39,7 @@ export default async function LoginPage() {
             <p className="mt-2 text-sm text-slate-600">Gunakan akun yang sudah terdaftar untuk melanjutkan.</p>
 
             <div className="mt-8 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-              <LoginForm />
+              <LoginForm callbackUrl={callbackUrl} />
             </div>
           </div>
         </section>
