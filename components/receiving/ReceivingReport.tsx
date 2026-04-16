@@ -56,11 +56,7 @@ export default function ReceivingReport({
       Object.fromEntries(
         order.items.map((item) => [
           item.itemCode,
-          item.qtyReceived === item.qtyConfirm && item.remarksDelivery.toLowerCase() === "sesuai"
-            ? "match"
-            : item.qtyReceived === 0 && item.remarksDelivery === ""
-              ? "reject"
-              : "neutral",
+          getReceivingCheckMode(String(item.qtyReceived || ""), item.remarksDelivery, item.qtyConfirm),
         ])
       )
     );
@@ -92,6 +88,18 @@ export default function ReceivingReport({
 
     if (invalidItem) {
       setFormError(`Qty received pada ${invalidItem.itemCode} tidak valid`);
+      return;
+    }
+
+    const incompleteItem = selectedOrder.items.find((item) => {
+      const rawQty = receivedValues[item.itemCode] ?? "";
+      const rawRemark = remarkValues[item.itemCode] ?? "";
+
+      return rawQty.trim() === "" || rawRemark.trim() === "";
+    });
+
+    if (incompleteItem) {
+      setFormError(`Qty received dan remarks pada ${incompleteItem.itemCode} wajib diisi`);
       return;
     }
 
@@ -194,11 +202,19 @@ export default function ReceivingReport({
           saving={saving}
           onQtyReceivedChange={(itemCode, qtyReceived) => {
             setReceivedValues((current) => ({ ...current, [itemCode]: qtyReceived }));
-            setCheckModes((current) => ({ ...current, [itemCode]: "neutral" }));
+            const item = selectedOrder.items.find((orderItem) => orderItem.itemCode === itemCode);
+            setCheckModes((current) => ({
+              ...current,
+              [itemCode]: getReceivingCheckMode(qtyReceived, remarkValues[itemCode] ?? "", item?.qtyConfirm ?? 0),
+            }));
           }}
           onRemarkChange={(itemCode, remark) => {
             setRemarkValues((current) => ({ ...current, [itemCode]: remark }));
-            setCheckModes((current) => ({ ...current, [itemCode]: "neutral" }));
+            const item = selectedOrder.items.find((orderItem) => orderItem.itemCode === itemCode);
+            setCheckModes((current) => ({
+              ...current,
+              [itemCode]: getReceivingCheckMode(receivedValues[itemCode] ?? "", remark, item?.qtyConfirm ?? 0),
+            }));
           }}
           onMarkMatch={(itemCode, qtyConfirm) => {
             setReceivedValues((current) => ({ ...current, [itemCode]: String(qtyConfirm) }));
@@ -618,6 +634,25 @@ function RemarksCell({ value }: { value: string }) {
       <div className="min-w-[220px] whitespace-pre-wrap break-words">{value}</div>
     </td>
   );
+}
+
+function getReceivingCheckMode(
+  qtyReceived: string,
+  remarksDelivery: string,
+  qtyConfirm: number
+): ReceivingCheckMode {
+  const parsedQty = Number(qtyReceived);
+  const normalizedRemark = remarksDelivery.trim().toLowerCase();
+
+  if (Number.isFinite(parsedQty) && parsedQty === qtyConfirm && normalizedRemark === "sesuai") {
+    return "match";
+  }
+
+  if (qtyReceived.trim() !== "" || remarksDelivery.trim() !== "") {
+    return "reject";
+  }
+
+  return "neutral";
 }
 
 function formatFilterLabel(value: OrderingFilter) {

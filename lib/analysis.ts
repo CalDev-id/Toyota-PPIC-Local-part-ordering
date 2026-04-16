@@ -1,3 +1,4 @@
+import { getDefaultDayNightByTime } from "@/lib/day-night";
 import { prisma } from "@/lib/prisma";
 
 export type AnalysisFilter = {
@@ -18,7 +19,7 @@ export type ResolvedAnalysisContext = {
 };
 
 const DEFAULT_SHIFT = "WHITE";
-const DEFAULT_DAY_NIGHT = "DAY";
+const DAY_NIGHT_OPTIONS = ["DAY", "NIGHT"] as const;
 
 export type DailyVolumePoint = {
   date: string;
@@ -91,7 +92,9 @@ export async function getAnalysisFilterOptions(): Promise<AnalysisFilterOptions>
 
   dates.add(formatDateInput(new Date()));
   shifts.add(DEFAULT_SHIFT);
-  dayNights.add(DEFAULT_DAY_NIGHT);
+  for (const dayNight of DAY_NIGHT_OPTIONS) {
+    dayNights.add(dayNight);
+  }
 
   return {
     dates: Array.from(dates).sort((a, b) => b.localeCompare(a)),
@@ -112,6 +115,7 @@ export async function resolveAnalysisContext(
 ): Promise<ResolvedAnalysisContext> {
   const options = await getAnalysisFilterOptions();
   const today = formatDateInput(new Date());
+  const defaultDayNight = getDefaultDayNightByTime();
 
   const date =
     input?.date && options.dates.includes(input.date)
@@ -132,9 +136,9 @@ export async function resolveAnalysisContext(
   const dayNight =
     dayNightCandidate && options.dayNights.includes(dayNightCandidate)
       ? dayNightCandidate
-      : options.dayNights.includes(DEFAULT_DAY_NIGHT)
-        ? DEFAULT_DAY_NIGHT
-        : options.dayNights[0] || DEFAULT_DAY_NIGHT;
+      : options.dayNights.includes(defaultDayNight)
+        ? defaultDayNight
+        : options.dayNights[0] || defaultDayNight;
 
   return {
     filter: { date, shift, dayNight },

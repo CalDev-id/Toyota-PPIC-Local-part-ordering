@@ -1,3 +1,4 @@
+import { getDefaultDayNightByTime } from "@/lib/day-night";
 import { prisma } from "@/lib/prisma";
 
 export type OrderMetricKey =
@@ -61,7 +62,7 @@ export type ResolvedOrderingContext = {
 };
 
 const DEFAULT_SHIFT = "WHITE";
-const DEFAULT_DAY_NIGHT = "DAY";
+const DAY_NIGHT_OPTIONS = ["DAY", "NIGHT"] as const;
 
 type MetricConfig = {
   key: OrderMetricKey;
@@ -155,7 +156,9 @@ export async function getOrderingFilterOptions(): Promise<OrderingFilterOptions>
 
   dates.add(formatDateInput(new Date()));
   shifts.add(DEFAULT_SHIFT);
-  dayNights.add(DEFAULT_DAY_NIGHT);
+  for (const dayNight of DAY_NIGHT_OPTIONS) {
+    dayNights.add(dayNight);
+  }
 
   return {
     dates: Array.from(dates).sort((a, b) => b.localeCompare(a)),
@@ -176,6 +179,7 @@ export async function resolveOrderingContext(
 ): Promise<ResolvedOrderingContext> {
   const options = await getOrderingFilterOptions();
   const today = formatDateInput(new Date());
+  const defaultDayNight = getDefaultDayNightByTime();
 
   const date =
     input?.date && options.dates.includes(input.date)
@@ -195,9 +199,9 @@ export async function resolveOrderingContext(
   const dayNightCandidate = normalizeDayNight(input?.dayNight);
   const dayNight = options.dayNights.includes(dayNightCandidate)
     ? dayNightCandidate
-    : options.dayNights.includes(DEFAULT_DAY_NIGHT)
-      ? DEFAULT_DAY_NIGHT
-      : options.dayNights[0] || DEFAULT_DAY_NIGHT;
+    : options.dayNights.includes(defaultDayNight)
+      ? defaultDayNight
+      : options.dayNights[0] || defaultDayNight;
 
   return {
     filter: { date, shift, dayNight },

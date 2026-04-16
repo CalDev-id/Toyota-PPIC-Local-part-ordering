@@ -1,5 +1,6 @@
 "use client";
 
+import { getDefaultDayNightByTime } from "@/lib/day-night";
 import type { FormEvent } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -32,25 +33,6 @@ type ToastState = {
   message: string;
 } | null;
 
-const emptyForm: PlanningFormValues = {
-  tanggal: getTodayInputValue(),
-  shift: "",
-  dayNight: "",
-  stockAwalJunbikiCb1tr: 0,
-  stockAwalJunbikiCb2tr: 0,
-  stockAwalEmergencyCb1tr: 0,
-  stockAwalEmergencyCb2tr: 0,
-  stockAwalEmergencyCr1tr: 0,
-  stockAwalEmergencyCam01: 0,
-  stockAwalEmergencyCam02: 0,
-  planProdCb1tr: 0,
-  planProdCb2tr: 0,
-  planProdCr1tr: 0,
-  planProdCam01: 0,
-  planProdCam02: 0,
-  remarks: "",
-};
-
 const shiftOptions = ["RED", "WHITE"];
 const PAGE_SIZE = 7;
 
@@ -59,8 +41,8 @@ export default function PlanningPageClient() {
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedDate, setSelectedDate] = useState(getTodayInputValue());
   const [selectedShift, setSelectedShift] = useState("WHITE");
-  const [selectedDayNight, setSelectedDayNight] = useState("DAY");
-  const [form, setForm] = useState<PlanningFormValues>(emptyForm);
+  const [selectedDayNight, setSelectedDayNight] = useState<string>(getDefaultDayNightByTime());
+  const [form, setForm] = useState<PlanningFormValues>(() => buildEmptyForm());
   const [editingId, setEditingId] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingMeta, setEditingMeta] = useState<Pick<PlanningRecord, "planId" | "inputBy" | "inputAt"> | null>(
@@ -205,7 +187,7 @@ export default function PlanningPageClient() {
   function resetForm() {
     setEditingId(null);
     setEditingMeta(null);
-    setForm(emptyForm);
+    setForm(buildEmptyForm());
   }
 
   function openCreateModal() {
@@ -731,6 +713,27 @@ function formatNumber(value: number) {
 
 function getTodayInputValue() {
   return new Date().toISOString().slice(0, 10);
+}
+
+function buildEmptyForm(): PlanningFormValues {
+  return {
+    tanggal: getTodayInputValue(),
+    shift: "",
+    dayNight: getDefaultDayNightByTime(),
+    stockAwalJunbikiCb1tr: 0,
+    stockAwalJunbikiCb2tr: 0,
+    stockAwalEmergencyCb1tr: 0,
+    stockAwalEmergencyCb2tr: 0,
+    stockAwalEmergencyCr1tr: 0,
+    stockAwalEmergencyCam01: 0,
+    stockAwalEmergencyCam02: 0,
+    planProdCb1tr: 0,
+    planProdCb2tr: 0,
+    planProdCr1tr: 0,
+    planProdCam01: 0,
+    planProdCam02: 0,
+    remarks: "",
+  };
 }
 
 function formatDateLabel(value: string) {
