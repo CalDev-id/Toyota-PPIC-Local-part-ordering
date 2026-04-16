@@ -166,3 +166,10 @@ ORDERING
 ```bash
 npm run lint
 ```
+
+npm run dev
+cloudflared tunnel run 3eb31d6c-0159-4b79-af15-dbb39f03abd6
+
+or
+npm run build
+npx next start -p 3000
