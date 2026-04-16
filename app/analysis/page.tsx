@@ -31,6 +31,7 @@ export default async function AnalysisPage({ searchParams }: AnalysisPageProps) 
   let dashboardData: AnalysisDashboardData = {
     volumeOrderHarian: [],
     requestVsConfirmedPerItem: [],
+    planRequestConfirmedWeekly: [],
   };
   const activeFilter: AnalysisFilter = selectedFilter;
   let errorMessage: string | null = null;

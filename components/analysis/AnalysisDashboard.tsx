@@ -7,6 +7,7 @@ import type {
   AnalysisFilterOptions,
   DailyVolumePoint,
   ItemMetricPoint,
+  WeeklyPlanRequestConfirmedPoint,
 } from "@/lib/analysis";
 
 type AnalysisDashboardProps = {
@@ -58,6 +59,12 @@ export default function AnalysisDashboard({
         title="Plan vs Request vs Confirmed"
         subtitle={`Bandingkan target plan dengan request aktual dan qty confirmed per item untuk ${selectedFilter.shift} / ${selectedFilter.dayNight} pada ${formatDateOption(selectedFilter.date)}.`}
         data={data.requestVsConfirmedPerItem}
+      />
+
+      <WeeklyPlanRequestConfirmedChart
+        title="Plan vs Request vs Confirmed 7 Hari"
+        subtitle={`Tren total plan, request, dan confirmed untuk 7 hari ke belakang hingga ${formatDateOption(selectedFilter.date)} pada ${selectedFilter.shift} / ${selectedFilter.dayNight}.`}
+        data={data.planRequestConfirmedWeekly}
       />
 
       {/* <DailyVolumeChart
@@ -328,6 +335,112 @@ function PlanRequestConfirmedChart({
                   className={`text-[11px] font-semibold ${item.gap > 0 ? "fill-amber-600" : "fill-emerald-600"}`}
                 >
                   Gap {formatNumber(item.gap)}
+                </text>
+              </g>
+            );
+          })}
+        </svg>
+      </div>
+
+      <div className="mt-3 flex flex-wrap gap-4 text-xs text-slate-600">
+        <LegendDot className="bg-slate-400" label="Plan" />
+        <LegendDot className="bg-sky-500" label="Request" />
+        <LegendDot className="bg-emerald-500" label="Confirmed" />
+      </div>
+    </article>
+  );
+}
+
+function WeeklyPlanRequestConfirmedChart({
+  title,
+  subtitle,
+  data,
+}: {
+  title: string;
+  subtitle: string;
+  data: WeeklyPlanRequestConfirmedPoint[];
+}) {
+  const width = 1120;
+  const height = 360;
+  const chartLeft = 52;
+  const chartBottom = 286;
+  const chartTop = 28;
+  const chartRight = 24;
+  const maxValue = Math.max(...data.flatMap((item) => [item.planTotal, item.requestTotal, item.confirmedTotal]), 1);
+  const chartHeight = chartBottom - chartTop;
+  const availableWidth = width - chartLeft - chartRight;
+  const groupWidth = availableWidth / Math.max(data.length, 1);
+  const barWidth = Math.min(18, Math.max(groupWidth / 5, 10));
+
+  return (
+    <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <header className="mb-4">
+        <h3 className="text-base font-semibold text-slate-900">{title}</h3>
+        <p className="text-sm text-slate-500">{subtitle}</p>
+      </header>
+
+      <div className="overflow-x-auto">
+        <svg viewBox={`0 0 ${width} ${height}`} className="h-[24rem] w-full min-w-[1040px]">
+          <line x1={chartLeft} y1={chartBottom} x2={width - chartRight} y2={chartBottom} className="stroke-slate-200" />
+          <line x1={chartLeft} y1={chartTop} x2={chartLeft} y2={chartBottom} className="stroke-slate-200" />
+
+          {[0, 0.25, 0.5, 0.75, 1].map((tick) => {
+            const y = chartBottom - chartHeight * tick;
+            const value = Math.round(maxValue * tick);
+            return (
+              <g key={tick}>
+                <line x1={chartLeft} y1={y} x2={width - chartRight} y2={y} className="stroke-slate-100" />
+                <text x={chartLeft - 10} y={y + 4} textAnchor="end" className="fill-slate-400 text-[12px]">
+                  {value}
+                </text>
+              </g>
+            );
+          })}
+
+          {data.map((item, index) => {
+            const baseX = chartLeft + index * groupWidth + groupWidth / 2;
+            const planHeight = (item.planTotal / maxValue) * chartHeight;
+            const requestHeight = (item.requestTotal / maxValue) * chartHeight;
+            const confirmedHeight = (item.confirmedTotal / maxValue) * chartHeight;
+            const gap = item.requestTotal - item.confirmedTotal;
+
+            return (
+              <g key={item.date}>
+                <rect
+                  x={baseX - barWidth * 1.5 - 6}
+                  y={chartBottom - planHeight}
+                  width={barWidth}
+                  height={Math.max(planHeight, 2)}
+                  rx="6"
+                  className="fill-slate-400"
+                />
+                <rect
+                  x={baseX - barWidth / 2}
+                  y={chartBottom - requestHeight}
+                  width={barWidth}
+                  height={Math.max(requestHeight, 2)}
+                  rx="6"
+                  className="fill-sky-500"
+                />
+                <rect
+                  x={baseX + barWidth / 2 + 6}
+                  y={chartBottom - confirmedHeight}
+                  width={barWidth}
+                  height={Math.max(confirmedHeight, 2)}
+                  rx="6"
+                  className="fill-emerald-500"
+                />
+
+                <text x={baseX} y={320} textAnchor="middle" className="fill-slate-600 text-[12px] font-medium">
+                  {item.label}
+                </text>
+                <text
+                  x={baseX}
+                  y={342}
+                  textAnchor="middle"
+                  className={`text-[11px] font-semibold ${gap > 0 ? "fill-amber-600" : "fill-emerald-600"}`}
+                >
+                  Gap {formatNumber(gap)}
                 </text>
               </g>
             );

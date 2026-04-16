@@ -53,6 +53,7 @@ export type ReceivingOrderItem = {
   qtyOrder: number;
   qtyConfirm: number;
   qtyReceived: number;
+  remarksDelivery: string;
   lineNo: number;
 };
 
@@ -94,6 +95,7 @@ export async function getReceivingPageData(filter: OrderingFilter): Promise<Rece
           qtyOrder: true,
           qtyConfirm: true,
           qtyReceived: true,
+          remarksDelivery: true,
           lineNo: true,
         },
         orderBy: [{ lineNo: "asc" }, { detailId: "asc" }],
@@ -137,6 +139,7 @@ export async function getReceivingPageData(filter: OrderingFilter): Promise<Rece
         qtyOrder: detail.qtyOrder ?? 0,
         qtyConfirm: detail.qtyConfirm ?? 0,
         qtyReceived: detail.qtyReceived ?? 0,
+        remarksDelivery: detail.remarksDelivery?.trim() || "",
         lineNo: detail.lineNo ?? 0,
       })),
       cb1tr: metrics.cb1tr,

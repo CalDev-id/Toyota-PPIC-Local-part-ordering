@@ -75,7 +75,7 @@ export default function TrackingPageClient({
           </p>
         </div>
       ) : (
-        <div className="grid gap-5">
+        <div className="grid gap-5 md:grid-cols-2">
           {rows.map((row) => (
             <TrackingCard key={row.orderId} row={row} />
           ))}
@@ -146,7 +146,7 @@ function TrackingCard({ row }: { row: TrackingOrderRow }) {
                     {formatNumber(metric.order)} | {formatNumber(metric.delivery)} | {formatNumber(metric.received ?? 0)}
                   </p>
                   <p className="mt-0.5 text-[10px] font-medium uppercase tracking-[0.14em] text-slate-500">
-                    Order | Konf | Rec
+                    Ord | Con | Rec
                   </p>
                 </div>
               );

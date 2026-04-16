@@ -760,7 +760,7 @@ function splitRatioIntoQty(ratioCb1tr: number, ratioCb2tr: number) {
     qty2tr,
   };
 }
-
+// ini shell junbiki
 function getShellStatusClassName(status: ShellStatus) {
   if (status === "active") {
     return "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100";
@@ -771,6 +771,7 @@ function getShellStatusClassName(status: ShellStatus) {
   }
 
   return "border-slate-200 bg-slate-100 text-slate-700 hover:bg-slate-200";
+  // return "border-slate-200 bg-slate-100 text-slate-700 hover:bg-slate-200";
 }
 
 function getTodayInputValue() {

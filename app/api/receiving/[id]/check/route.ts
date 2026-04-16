@@ -17,6 +17,7 @@ type CheckReceivingPayload = {
 type CheckReceivingItem = {
   itemCode: string;
   qtyReceived: number;
+  remarksDelivery: string | null;
 };
 
 export async function PUT(req: Request, context: RouteContext) {
@@ -70,6 +71,7 @@ export async function PUT(req: Request, context: RouteContext) {
           where: { detailId: detailIdsByCode.get(item.itemCode)! },
           data: {
             qtyReceived: item.qtyReceived,
+            remarksDelivery: item.remarksDelivery,
             updatedAt: now,
           },
         })
@@ -105,6 +107,8 @@ function normalizeItems(value: unknown): CheckReceivingItem[] {
   return value.map((item, index) => {
     const itemCode = typeof item?.itemCode === "string" ? item.itemCode.trim().toUpperCase() : "";
     const qtyReceived = Number(item?.qtyReceived);
+    const remarksDelivery =
+      typeof item?.remarksDelivery === "string" ? item.remarksDelivery.trim() : "";
 
     if (!itemCode) {
       throw new Error(`Item code pada baris ${index + 1} wajib diisi`);
@@ -117,6 +121,7 @@ function normalizeItems(value: unknown): CheckReceivingItem[] {
     return {
       itemCode,
       qtyReceived,
+      remarksDelivery: remarksDelivery || null,
     };
   });
 }

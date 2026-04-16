@@ -27,6 +27,14 @@ export type DailyVolumePoint = {
   deliveryTotal: number;
 };
 
+export type WeeklyPlanRequestConfirmedPoint = {
+  date: string;
+  label: string;
+  planTotal: number;
+  requestTotal: number;
+  confirmedTotal: number;
+};
+
 export type ItemMetricPoint = {
   key: "CB_1TR" | "CB_2TR" | "CAM_01" | "CAM_02" | "CR_1TR";
   label: string;
@@ -39,6 +47,7 @@ export type ItemMetricPoint = {
 export type AnalysisDashboardData = {
   volumeOrderHarian: DailyVolumePoint[];
   requestVsConfirmedPerItem: ItemMetricPoint[];
+  planRequestConfirmedWeekly: WeeklyPlanRequestConfirmedPoint[];
 };
 
 const ITEM_DEFINITIONS = [
@@ -137,8 +146,10 @@ export async function getAnalysisDashboardData(filter: AnalysisFilter): Promise<
   const anchorDate = new Date(`${filter.date}T00:00:00.000Z`);
   const rangeStart = new Date(anchorDate);
   rangeStart.setUTCDate(rangeStart.getUTCDate() - 13);
+  const weeklyRangeStart = new Date(anchorDate);
+  weeklyRangeStart.setUTCDate(weeklyRangeStart.getUTCDate() - 6);
 
-  const [rangeHeaders, filteredHeaders, planning] = await Promise.all([
+  const [rangeHeaders, filteredHeaders, planning, weeklyHeaders, weeklyPlanningRows] = await Promise.all([
     prisma.orderHeader.findMany({
       where: {
         kodeOrder: { startsWith: "ORD-" },
@@ -181,6 +192,40 @@ export async function getAnalysisDashboardData(filter: AnalysisFilter): Promise<
         shift: filter.shift,
         dayNight: nullableFilterValue(filter.dayNight),
       },
+    }),
+    prisma.orderHeader.findMany({
+      where: {
+        kodeOrder: { startsWith: "ORD-" },
+        tanggalOrder: { gte: weeklyRangeStart, lte: anchorDate },
+        shift: filter.shift,
+        dayNight: nullableFilterValue(filter.dayNight),
+      },
+      select: {
+        tanggalOrder: true,
+        details: {
+          select: {
+            qtyOrder: true,
+            qtyConfirm: true,
+          },
+        },
+      },
+      orderBy: [{ tanggalOrder: "asc" }, { waktuOrder: "asc" }],
+    }),
+    prisma.dailyPlanning.findMany({
+      where: {
+        tanggal: { gte: weeklyRangeStart, lte: anchorDate },
+        shift: filter.shift,
+        dayNight: nullableFilterValue(filter.dayNight),
+      },
+      select: {
+        tanggal: true,
+        planProdCb1tr: true,
+        planProdCb2tr: true,
+        planProdCr1tr: true,
+        planProdCam01: true,
+        planProdCam02: true,
+      },
+      orderBy: [{ tanggal: "asc" }],
     }),
   ]);
 
@@ -236,6 +281,49 @@ export async function getAnalysisDashboardData(filter: AnalysisFilter): Promise<
     plan: planByItem[definition.key],
   }));
 
+  const weeklyTotalsByDate = new Map<
+    string,
+    { planTotal: number; requestTotal: number; confirmedTotal: number }
+  >();
+
+  for (let index = 0; index < 7; index += 1) {
+    const date = new Date(weeklyRangeStart);
+    date.setUTCDate(weeklyRangeStart.getUTCDate() + index);
+    weeklyTotalsByDate.set(formatDateInput(date), {
+      planTotal: 0,
+      requestTotal: 0,
+      confirmedTotal: 0,
+    });
+  }
+
+  for (const row of weeklyPlanningRows) {
+    const key = formatDateInput(row.tanggal);
+    const current = weeklyTotalsByDate.get(key);
+    if (!current) {
+      continue;
+    }
+
+    current.planTotal +=
+      (row.planProdCb1tr ?? 0) +
+      (row.planProdCb2tr ?? 0) +
+      (row.planProdCr1tr ?? 0) +
+      (row.planProdCam01 ?? 0) +
+      (row.planProdCam02 ?? 0);
+  }
+
+  for (const header of weeklyHeaders) {
+    const key = formatDateInput(header.tanggalOrder);
+    const current = weeklyTotalsByDate.get(key);
+    if (!current) {
+      continue;
+    }
+
+    for (const detail of header.details) {
+      current.requestTotal += detail.qtyOrder ?? 0;
+      current.confirmedTotal += detail.qtyConfirm ?? 0;
+    }
+  }
+
   return {
     volumeOrderHarian: Array.from(volumeByDate.entries()).map(([date, value]) => ({
       date,
@@ -244,6 +332,13 @@ export async function getAnalysisDashboardData(filter: AnalysisFilter): Promise<
       deliveryTotal: value.deliveryTotal,
     })),
     requestVsConfirmedPerItem: itemMetrics,
+    planRequestConfirmedWeekly: Array.from(weeklyTotalsByDate.entries()).map(([date, value]) => ({
+      date,
+      label: formatShortDateLabel(date),
+      planTotal: value.planTotal,
+      requestTotal: value.requestTotal,
+      confirmedTotal: value.confirmedTotal,
+    })),
   };
 }
 

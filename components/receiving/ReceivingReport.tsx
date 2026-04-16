@@ -11,6 +11,8 @@ import type {
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
+type ReceivingCheckMode = "match" | "reject" | "neutral";
+
 type ReceivingReportProps = {
   activeOrders: ReceivingQueueRow[];
   finishedOrders: ReceivingQueueRow[];
@@ -31,6 +33,8 @@ export default function ReceivingReport({
   const router = useRouter();
   const [selectedOrder, setSelectedOrder] = useState<ReceivingQueueRow | null>(null);
   const [receivedValues, setReceivedValues] = useState<Record<string, string>>({});
+  const [remarkValues, setRemarkValues] = useState<Record<string, string>>({});
+  const [checkModes, setCheckModes] = useState<Record<string, ReceivingCheckMode>>({});
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
   const [toastMessage, setToastMessage] = useState("");
@@ -47,6 +51,19 @@ export default function ReceivingReport({
   function openCheckModal(order: ReceivingQueueRow) {
     setSelectedOrder(order);
     setReceivedValues(Object.fromEntries(order.items.map((item) => [item.itemCode, String(item.qtyReceived || "")])));
+    setRemarkValues(Object.fromEntries(order.items.map((item) => [item.itemCode, item.remarksDelivery])));
+    setCheckModes(
+      Object.fromEntries(
+        order.items.map((item) => [
+          item.itemCode,
+          item.qtyReceived === item.qtyConfirm && item.remarksDelivery.toLowerCase() === "sesuai"
+            ? "match"
+            : item.qtyReceived === 0 && item.remarksDelivery === ""
+              ? "reject"
+              : "neutral",
+        ])
+      )
+    );
     setFormError("");
   }
 
@@ -57,6 +74,8 @@ export default function ReceivingReport({
 
     setSelectedOrder(null);
     setReceivedValues({});
+    setRemarkValues({});
+    setCheckModes({});
     setFormError("");
   }
 
@@ -89,6 +108,7 @@ export default function ReceivingReport({
           items: selectedOrder.items.map((item) => ({
             itemCode: item.itemCode,
             qtyReceived: Number(receivedValues[item.itemCode] ?? "") || 0,
+            remarksDelivery: remarkValues[item.itemCode] ?? "",
           })),
         }),
       });
@@ -168,11 +188,28 @@ export default function ReceivingReport({
         <CheckReceivingModal
           order={selectedOrder}
           receivedValues={receivedValues}
+          remarkValues={remarkValues}
+          checkModes={checkModes}
           formError={formError}
           saving={saving}
-          onQtyReceivedChange={(itemCode, qtyReceived) =>
-            setReceivedValues((current) => ({ ...current, [itemCode]: qtyReceived }))
-          }
+          onQtyReceivedChange={(itemCode, qtyReceived) => {
+            setReceivedValues((current) => ({ ...current, [itemCode]: qtyReceived }));
+            setCheckModes((current) => ({ ...current, [itemCode]: "neutral" }));
+          }}
+          onRemarkChange={(itemCode, remark) => {
+            setRemarkValues((current) => ({ ...current, [itemCode]: remark }));
+            setCheckModes((current) => ({ ...current, [itemCode]: "neutral" }));
+          }}
+          onMarkMatch={(itemCode, qtyConfirm) => {
+            setReceivedValues((current) => ({ ...current, [itemCode]: String(qtyConfirm) }));
+            setRemarkValues((current) => ({ ...current, [itemCode]: "sesuai" }));
+            setCheckModes((current) => ({ ...current, [itemCode]: "match" }));
+          }}
+          onMarkReject={(itemCode) => {
+            setReceivedValues((current) => ({ ...current, [itemCode]: "" }));
+            setRemarkValues((current) => ({ ...current, [itemCode]: "" }));
+            setCheckModes((current) => ({ ...current, [itemCode]: "reject" }));
+          }}
           onClose={closeCheckModal}
           onSubmit={handleCheckSubmit}
         />
@@ -316,17 +353,27 @@ function QueueTable({
 function CheckReceivingModal({
   order,
   receivedValues,
+  remarkValues,
+  checkModes,
   formError,
   saving,
   onQtyReceivedChange,
+  onRemarkChange,
+  onMarkMatch,
+  onMarkReject,
   onClose,
   onSubmit,
 }: {
   order: ReceivingQueueRow;
   receivedValues: Record<string, string>;
+  remarkValues: Record<string, string>;
+  checkModes: Record<string, ReceivingCheckMode>;
   formError: string;
   saving: boolean;
   onQtyReceivedChange: (itemCode: string, qtyReceived: string) => void;
+  onRemarkChange: (itemCode: string, remark: string) => void;
+  onMarkMatch: (itemCode: string, qtyConfirm: number) => void;
+  onMarkReject: (itemCode: string) => void;
   onClose: () => void;
   onSubmit: () => void;
 }) {
@@ -368,7 +415,9 @@ function CheckReceivingModal({
                   <th className="border-b border-slate-200 px-4 py-3 text-left font-semibold">Item Name</th>
                   <th className="border-b border-slate-200 px-4 py-3 text-right font-semibold">Qty Order</th>
                   <th className="border-b border-slate-200 px-4 py-3 text-right font-semibold">Qty Confirm</th>
+                  <th className="border-b border-slate-200 px-4 py-3 text-center font-semibold">Check</th>
                   <th className="border-b border-slate-200 px-4 py-3 text-right font-semibold">Qty Received</th>
+                  <th className="border-b border-slate-200 px-4 py-3 text-left font-semibold">Remarks</th>
                 </tr>
               </thead>
               <tbody>
@@ -382,6 +431,34 @@ function CheckReceivingModal({
                     <td className="border-b border-slate-200 px-4 py-3 text-right text-slate-700">
                       {formatNumber(item.qtyConfirm)}
                     </td>
+                    <td className="border-b border-slate-200 px-4 py-3">
+                      <div className="flex items-center justify-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => onMarkMatch(item.itemCode, item.qtyConfirm)}
+                          className={`flex h-9 w-9 items-center justify-center rounded-full border text-sm font-bold transition ${
+                            checkModes[item.itemCode] === "match"
+                              ? "border-emerald-600 bg-emerald-600 text-white"
+                              : "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                          }`}
+                          aria-label={`Tandai ${item.itemCode} sesuai`}
+                        >
+                          ✓
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => onMarkReject(item.itemCode)}
+                          className={`flex h-9 w-9 items-center justify-center rounded-full border text-sm font-bold transition ${
+                            checkModes[item.itemCode] === "reject"
+                              ? "border-rose-600 bg-rose-600 text-white"
+                              : "border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100"
+                          }`}
+                          aria-label={`Tandai ${item.itemCode} tidak sesuai`}
+                        >
+                          X
+                        </button>
+                      </div>
+                    </td>
                     <td className="border-b border-slate-200 px-4 py-3 text-right">
                       <input
                         type="number"
@@ -390,6 +467,14 @@ function CheckReceivingModal({
                         value={receivedValues[item.itemCode] ?? ""}
                         onChange={(event) => onQtyReceivedChange(item.itemCode, event.target.value)}
                         className="ml-auto block h-11 w-28 rounded-xl border border-slate-300 px-3 text-right text-sm text-slate-700 outline-none transition focus:border-sky-500"
+                      />
+                    </td>
+                    <td className="border-b border-slate-200 px-4 py-3">
+                      <input
+                        type="text"
+                        value={remarkValues[item.itemCode] ?? ""}
+                        onChange={(event) => onRemarkChange(item.itemCode, event.target.value)}
+                        className="block h-11 w-full min-w-32 rounded-xl border border-slate-300 px-3 text-sm text-slate-700 outline-none transition focus:border-sky-500"
                       />
                     </td>
                   </tr>
