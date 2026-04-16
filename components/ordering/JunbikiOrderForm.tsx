@@ -1,7 +1,9 @@
 "use client";
 
+import RitaseProgressCard from "@/components/ordering/RitaseProgressCard";
+import { getRitaseSchedule, RITASE_OPTIONS, type RitaseScheduleItem } from "@/lib/ritase-schedule";
 import type { FormEvent } from "react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 type Shift = "RED" | "WHITE";
 type DayNight = "DAY" | "NIGHT";
@@ -55,6 +57,13 @@ type ToastState = {
   message: string;
 } | null;
 
+type RitaseProgressState = {
+  loading: boolean;
+  orderCount: number;
+  nextRitase: RitaseScheduleItem | null;
+  schedule: RitaseScheduleItem[];
+};
+
 type JunbikiOrderFormProps = {
   orderId?: string;
   initialValues?: {
@@ -79,7 +88,6 @@ type JunbikiOrderFormProps = {
 
 const SHIFT_OPTIONS: Shift[] = ["RED", "WHITE"];
 const DAY_NIGHT_OPTIONS: DayNight[] = ["DAY", "NIGHT"];
-const RITASE_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8];
 const MAX_TOTAL_QTY = 90;
 const PCS_PER_GROUP = 5;
 
@@ -131,6 +139,12 @@ export default function JunbikiOrderForm({
   const [savingAction, setSavingAction] = useState<"draft" | "submit" | null>(null);
   const [error, setError] = useState("");
   const [toast, setToast] = useState<ToastState>(null);
+  const [ritaseProgress, setRitaseProgress] = useState<RitaseProgressState>({
+    loading: false,
+    orderCount: 0,
+    nextRitase: null,
+    schedule: [],
+  });
   const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isEditing = Boolean(orderId);
 
@@ -167,6 +181,66 @@ export default function JunbikiOrderForm({
   function updateHeader<Key extends keyof JunbikiOrderHeader>(key: Key, value: JunbikiOrderHeader[Key]) {
     setHeader((current) => ({ ...current, [key]: value }));
   }
+
+  const loadRitaseProgress = useCallback(async (date: string, dayNight: DayNight, signal: AbortSignal) => {
+    setRitaseProgress((current) => ({
+      ...current,
+      loading: true,
+      schedule: getRitaseSchedule(dayNight),
+    }));
+
+    try {
+      const params = new URLSearchParams({ date, dayNight });
+      if (orderId) {
+        params.set("excludeOrderId", orderId);
+      }
+
+      const response = await fetch(`/api/ordering/ritase-progress?${params.toString()}`, {
+        cache: "no-store",
+        signal,
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error ?? "Gagal mengambil progress ritase");
+      }
+
+      setRitaseProgress({
+        loading: false,
+        orderCount: data.orderCount ?? 0,
+        nextRitase: data.nextRitase ?? null,
+        schedule: data.schedule ?? getRitaseSchedule(dayNight),
+      });
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") {
+        return;
+      }
+
+      setRitaseProgress({
+        loading: false,
+        orderCount: 0,
+        nextRitase: null,
+        schedule: getRitaseSchedule(dayNight),
+      });
+    }
+  }, [orderId]);
+
+  useEffect(() => {
+    if (!header.tanggal_order || !header.day_night) {
+      setRitaseProgress({
+        loading: false,
+        orderCount: 0,
+        nextRitase: null,
+        schedule: getRitaseSchedule(header.day_night),
+      });
+      return;
+    }
+
+    const controller = new AbortController();
+    void loadRitaseProgress(header.tanggal_order, header.day_night, controller.signal);
+
+    return () => controller.abort();
+  }, [header.tanggal_order, header.day_night, loadRitaseProgress]);
 
   function handleToggleShell(shell: ShellItem) {
     const currentStatus = shellStatuses[shell.code] ?? "idle";
@@ -246,7 +320,13 @@ export default function JunbikiOrderForm({
   return (
     <section className="space-y-5">
       <form onSubmit={handleSubmit} className="space-y-5">
-        <OrderFormHeader header={header} onChange={updateHeader} onClose={onCancel} isEditing={isEditing} />
+        <OrderFormHeader
+          header={header}
+          ritaseProgress={ritaseProgress}
+          onChange={updateHeader}
+          onClose={onCancel}
+          isEditing={isEditing}
+        />
 
         <div className="grid gap-5 xl:grid-cols-[minmax(280px,0.75fr)_minmax(0,1.65fr)]">
           <ShellGridSection
@@ -305,11 +385,13 @@ export default function JunbikiOrderForm({
 
 function OrderFormHeader({
   header,
+  ritaseProgress,
   onChange,
   onClose,
   isEditing = false,
 }: {
   header: JunbikiOrderHeader;
+  ritaseProgress: RitaseProgressState;
   onChange: <Key extends keyof JunbikiOrderHeader>(key: Key, value: JunbikiOrderHeader[Key]) => void;
   onClose?: () => void;
   isEditing?: boolean;
@@ -329,29 +411,44 @@ function OrderFormHeader({
         ) : null}
       </div>
 
-      <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <DateField label="Tanggal Order" value={header.tanggal_order} onChange={(value) => onChange("tanggal_order", value)} />
-        <SelectField
-          label="Shift"
-          value={header.shift}
-          options={SHIFT_OPTIONS}
-          placeholder="Pilih shift"
-          onChange={(value) => onChange("shift", value as Shift | "")}
-        />
-        <SelectField
-          label="Day / Night"
-          value={header.day_night}
-          options={DAY_NIGHT_OPTIONS}
-          placeholder="Pilih day / night"
-          onChange={(value) => onChange("day_night", value as DayNight | "")}
-        />
-        <SelectField
-          label="Ritase"
-          value={String(header.ritase)}
-          options={RITASE_OPTIONS.map(String)}
-          placeholder="Pilih ritase"
-          onChange={(value) => onChange("ritase", Number(value || 1))}
-        />
+      <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-[minmax(220px,1.4fr)_minmax(150px,1fr)_minmax(150px,1fr)_minmax(150px,1fr)_max-content] xl:items-end">
+        <div>
+          <DateField label="Tanggal Order" value={header.tanggal_order} onChange={(value) => onChange("tanggal_order", value)} />
+        </div>
+        <div>
+          <SelectField
+            label="Shift"
+            value={header.shift}
+            options={SHIFT_OPTIONS}
+            placeholder="Pilih shift"
+            onChange={(value) => onChange("shift", value as Shift | "")}
+          />
+        </div>
+        <div>
+          <SelectField
+            label="Day / Night"
+            value={header.day_night}
+            options={DAY_NIGHT_OPTIONS}
+            placeholder="Pilih day / night"
+            onChange={(value) => onChange("day_night", value as DayNight | "")}
+          />
+        </div>
+        <div>
+          <SelectField
+            label="Ritase"
+            value={String(header.ritase)}
+            options={RITASE_OPTIONS.map(String)}
+            placeholder="Pilih ritase"
+            onChange={(value) => onChange("ritase", Number(value || 1))}
+          />
+        </div>
+        {isEditing ? null : (
+          <RitaseProgressCard
+            loading={ritaseProgress.loading}
+            nextRitase={ritaseProgress.nextRitase}
+            schedule={ritaseProgress.schedule}
+          />
+        )}
       </div>
     </section>
   );

@@ -1,7 +1,9 @@
 "use client";
 
+import RitaseProgressCard from "@/components/ordering/RitaseProgressCard";
+import { getRitaseSchedule, RITASE_OPTIONS, type RitaseScheduleItem } from "@/lib/ritase-schedule";
 import type { FormEvent } from "react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 type ItemCode = "CR_1TR" | "CAM_01" | "CAM_02" | "CB_1TR" | "CB_2TR";
@@ -21,6 +23,13 @@ type ToastState = {
   message: string;
 } | null;
 
+type RitaseProgressState = {
+  loading: boolean;
+  orderCount: number;
+  nextRitase: RitaseScheduleItem | null;
+  schedule: RitaseScheduleItem[];
+};
+
 type PalletOrderFormProps = {
   embedded?: boolean;
   orderId?: string;
@@ -32,11 +41,12 @@ type PalletOrderFormProps = {
 
 const shiftOptions = ["RED", "WHITE"];
 const dayNightOptions = ["DAY", "NIGHT"];
+const ritaseOptions = RITASE_OPTIONS.map(String);
 
 const emptyForm: PalletFormState = {
   shift: "",
   dayNight: "",
-  ritaseRequest: 0,
+  ritaseRequest: 1,
   remarksOrdering: "",
   items: {
     CR_1TR: 0,
@@ -70,6 +80,12 @@ export default function PalletOrderForm({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [toast, setToast] = useState<ToastState>(null);
+  const [ritaseProgress, setRitaseProgress] = useState<RitaseProgressState>({
+    loading: false,
+    orderCount: 0,
+    nextRitase: null,
+    schedule: [],
+  });
   const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const isEditing = Boolean(orderId);
@@ -95,6 +111,7 @@ export default function PalletOrderForm({
     void loadPlans(form.shift, form.dayNight);
   }, [form.shift, form.dayNight]);
 
+  const todayDate = useMemo(() => formatDateInput(new Date()), []);
   const todayLabel = useMemo(() => formatDateLabel(new Date()), []);
 
   function showToast(type: "success" | "error", message: string) {
@@ -130,6 +147,66 @@ export default function PalletOrderForm({
       setLoadingPlans(false);
     }
   }
+
+  const loadRitaseProgress = useCallback(async (date: string, dayNight: string, signal: AbortSignal) => {
+    setRitaseProgress((current) => ({
+      ...current,
+      loading: true,
+      schedule: getRitaseSchedule(dayNight),
+    }));
+
+    try {
+      const params = new URLSearchParams({ date, dayNight });
+      if (orderId) {
+        params.set("excludeOrderId", orderId);
+      }
+
+      const res = await fetch(`/api/ordering/ritase-progress?${params.toString()}`, {
+        cache: "no-store",
+        signal,
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error ?? "Gagal mengambil progress ritase");
+      }
+
+      setRitaseProgress({
+        loading: false,
+        orderCount: data.orderCount ?? 0,
+        nextRitase: data.nextRitase ?? null,
+        schedule: data.schedule ?? getRitaseSchedule(dayNight),
+      });
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") {
+        return;
+      }
+
+      setRitaseProgress({
+        loading: false,
+        orderCount: 0,
+        nextRitase: null,
+        schedule: getRitaseSchedule(dayNight),
+      });
+    }
+  }, [orderId]);
+
+  useEffect(() => {
+    if (!form.dayNight) {
+      setRitaseProgress({
+        loading: false,
+        orderCount: 0,
+        nextRitase: null,
+        schedule: [],
+      });
+      return;
+    }
+
+    const controller = new AbortController();
+    void loadRitaseProgress(todayDate, form.dayNight, controller.signal);
+
+    return () => controller.abort();
+  }, [todayDate, form.dayNight, loadRitaseProgress]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -208,27 +285,44 @@ export default function PalletOrderForm({
 
       <form onSubmit={handleSubmit} className="space-y-5">
         <div className="rounded-2xl border border-slate-200 bg-white/95 p-5 shadow-sm">
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <ReadOnlyField label="Tanggal Order" value={todayLabel} />
-            <SelectField
-              label="Shift"
-              value={form.shift}
-              options={shiftOptions}
-              placeholder="Pilih shift"
-              onChange={(value) => setForm((current) => ({ ...current, shift: value }))}
-            />
-            <SelectField
-              label="Day / Night"
-              value={form.dayNight}
-              options={dayNightOptions}
-              placeholder="Pilih day / night"
-              onChange={(value) => setForm((current) => ({ ...current, dayNight: value }))}
-            />
-            <NumberField
-              label="Ritase Request"
-              value={form.ritaseRequest}
-              onChange={(value) => setForm((current) => ({ ...current, ritaseRequest: value }))}
-            />
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-[minmax(220px,1.4fr)_minmax(150px,1fr)_minmax(150px,1fr)_minmax(150px,1fr)_max-content] xl:items-end">
+            <div>
+              <ReadOnlyField label="Tanggal Order" value={todayLabel} />
+            </div>
+            <div>
+              <SelectField
+                label="Shift"
+                value={form.shift}
+                options={shiftOptions}
+                placeholder="Pilih shift"
+                onChange={(value) => setForm((current) => ({ ...current, shift: value }))}
+              />
+            </div>
+            <div>
+              <SelectField
+                label="Day / Night"
+                value={form.dayNight}
+                options={dayNightOptions}
+                placeholder="Pilih day / night"
+                onChange={(value) => setForm((current) => ({ ...current, dayNight: value }))}
+              />
+            </div>
+            <div>
+              <SelectField
+                label="Ritase Request"
+                value={String(form.ritaseRequest)}
+                options={ritaseOptions}
+                placeholder="Pilih ritase"
+                onChange={(value) => setForm((current) => ({ ...current, ritaseRequest: Number(value || 1) }))}
+              />
+            </div>
+            {isEditing ? null : (
+              <RitaseProgressCard
+                loading={ritaseProgress.loading}
+                nextRitase={ritaseProgress.nextRitase}
+                schedule={ritaseProgress.schedule}
+              />
+            )}
           </div>
 
           <div className="mt-4">
@@ -494,6 +588,10 @@ function formatDateLabel(value: Date) {
     dateStyle: "full",
     timeZone: "UTC",
   }).format(value);
+}
+
+function formatDateInput(value: Date) {
+  return value.toISOString().slice(0, 10);
 }
 
 function formatNumber(value: number) {

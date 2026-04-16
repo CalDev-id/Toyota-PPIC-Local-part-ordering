@@ -285,7 +285,16 @@ export default function OrderingReport({
                     remark: editableOrder.remarksOrdering,
                     selected_shells: editableOrder.selectedShells,
                   }
-                : null
+                : {
+                    tanggal_order: selectedFilter.date,
+                    shift: selectedFilter.shift as "RED" | "WHITE",
+                    day_night: selectedFilter.dayNight as "DAY" | "NIGHT",
+                    ritase: 1,
+                    ratio_cb_1tr: 0,
+                    ratio_cb_2tr: 0,
+                    remark: "",
+                    selected_shells: [],
+                  }
             }
             onCancel={closeOrderModal}
             onSuccess={(kodeOrder) => {
@@ -318,7 +327,19 @@ export default function OrderingReport({
                       CB_2TR: editableOrder.items.find((item) => item.itemCode === "CB_2TR")?.qtyOrder ?? 0,
                     },
                   }
-                : null
+                : {
+                    shift: selectedFilter.shift,
+                    dayNight: selectedFilter.dayNight,
+                    ritaseRequest: 1,
+                    remarksOrdering: "",
+                    items: {
+                      CR_1TR: 0,
+                      CAM_01: 0,
+                      CAM_02: 0,
+                      CB_1TR: 0,
+                      CB_2TR: 0,
+                    },
+                  }
             }
             onCancel={closeOrderModal}
             onSuccess={(kodeOrder) => {
