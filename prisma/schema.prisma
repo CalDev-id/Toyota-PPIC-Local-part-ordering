@@ -102,6 +102,7 @@ model OrderHeader {
   shift           String
   dayNight        String?       @map("day_night")
   truckType       String?       @map("truck_type")
+  requestType     String        @default("ORDER") @map("request_type")
   ritaseRequest   Int?          @default(0) @map("ritase_request")
   ratioCb1tr      Int           @default(0) @map("ratio_cb_1tr")
   ratioCb2tr      Int           @default(0) @map("ratio_cb_2tr")
@@ -128,6 +129,7 @@ model OrderDetail {
   itemCode         String      @map("item_code")
   itemName         String      @map("item_name")
   qtyOrder         Int         @default(0) @map("qty_order")
+  gapRequestQty    Int         @default(0) @map("gap_request_qty")
   qtyConfirm       Int?        @default(0) @map("qty_confirm")
   qtyReceived      Int?        @default(0) @map("qty_received")
   remarksOrdering  String?     @map("remarks_ordering")

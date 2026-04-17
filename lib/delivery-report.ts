@@ -59,6 +59,7 @@ export type DeliveryOrderItem = {
   itemCode: string;
   itemName: string;
   qtyOrder: number;
+  gapRequestQty: number;
   qtyConfirm: number;
   lineNo: number;
 };
@@ -101,6 +102,7 @@ export async function getDeliveryPageData(filter: OrderingFilter): Promise<Deliv
           itemCode: true,
           itemName: true,
           qtyOrder: true,
+          gapRequestQty: true,
           qtyConfirm: true,
           lineNo: true,
         },
@@ -122,6 +124,7 @@ export async function getDeliveryPageData(filter: OrderingFilter): Promise<Deliv
 
       metrics[metricKey] = {
         order: detail.qtyOrder ?? 0,
+        gapRequest: detail.gapRequestQty ?? 0,
         delivery: detail.qtyConfirm ?? 0,
       };
     }
@@ -144,6 +147,7 @@ export async function getDeliveryPageData(filter: OrderingFilter): Promise<Deliv
         itemCode: normalizeText(detail.itemCode),
         itemName: normalizeText(detail.itemName),
         qtyOrder: detail.qtyOrder ?? 0,
+        gapRequestQty: detail.gapRequestQty ?? 0,
         qtyConfirm: detail.qtyConfirm ?? 0,
         lineNo: detail.lineNo ?? 0,
       })),

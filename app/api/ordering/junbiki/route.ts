@@ -1,6 +1,7 @@
 import { authOptions } from "@/auth";
 import {
   buildJunbikiOrderData,
+  getJunbikiOrderNeedMetrics,
   normalizeJunbikiOrderPayload,
   validateJunbikiOrderInput,
 } from "@/lib/junbiki-order";
@@ -9,6 +10,35 @@ import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
+
+export async function GET(req: Request) {
+  try {
+    const session = await getServerSession(authOptions);
+
+    if (!session?.user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    if (session.user.role !== "ORDERING" && session.user.role !== "ADMIN") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    const { searchParams } = new URL(req.url);
+    const date = searchParams.get("date")?.trim() || "";
+    const shift = searchParams.get("shift")?.trim().toUpperCase() || "";
+    const dayNight = searchParams.get("dayNight")?.trim().toUpperCase() || "";
+    const excludeOrderId = searchParams.get("excludeOrderId")?.trim() || undefined;
+
+    const orderNeeds = date && shift && dayNight
+      ? await getJunbikiOrderNeedMetrics(date, shift, dayNight, excludeOrderId)
+      : { CB_1TR: 0, CB_2TR: 0 };
+
+    return NextResponse.json({ orderNeeds });
+  } catch (error) {
+    console.error(error);
+    return NextResponse.json({ error: "Gagal mengambil order need Junbiki" }, { status: 500 });
+  }
+}
 
 export async function POST(req: Request) {
   try {

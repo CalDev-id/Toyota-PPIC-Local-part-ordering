@@ -325,9 +325,9 @@ export default function PlanningPageClient() {
               <MetricRow label="Stock Awal" value={item.stock} />
               <MetricRow label="Plan" value={item.plan} />
               <MetricRow
-                label="Gap"
-                value={item.stock - item.plan}
-                valueClassName={item.stock - item.plan < 0 ? "text-rose-600" : "text-emerald-600"}
+                label="Plan Order"
+                value={Math.max(item.plan - item.stock, 0)}
+                valueClassName="text-emerald-600"
               />
             </div>
           </article>

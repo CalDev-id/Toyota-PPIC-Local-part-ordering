@@ -11,6 +11,7 @@ export type OrderMetricKey =
 export type OrderMetricPair = {
   order: number;
   delivery: number;
+  gapRequest?: number;
   received?: number;
 };
 
@@ -23,6 +24,7 @@ export type OrderReportRow = {
   shift: string;
   dayNight: string;
   truckType: string;
+  ritaseRequest: number;
   statusOrder: string;
   cb1tr: OrderMetricPair;
   cb2tr: OrderMetricPair;
@@ -31,6 +33,7 @@ export type OrderReportRow = {
   cr1tr: OrderMetricPair;
   remarksJunbikiS2: string;
   remarksPalletS2: string;
+  remarksGapS2: string;
   sortDateValue: number;
 };
 
@@ -225,12 +228,14 @@ export async function getOrderReportRows(filter: OrderingFilter): Promise<OrderR
       shift: true,
       dayNight: true,
       truckType: true,
+      ritaseRequest: true,
       statusOrder: true,
       remarksOrdering: true,
       details: {
         select: {
           itemCode: true,
           qtyOrder: true,
+          gapRequestQty: true,
           qtyConfirm: true,
           lineNo: true,
         },
@@ -251,6 +256,7 @@ export async function getOrderReportRows(filter: OrderingFilter): Promise<OrderR
 
       metrics[metric.key] = {
         order: detail.qtyOrder,
+        gapRequest: detail.gapRequestQty ?? 0,
         delivery: detail.qtyConfirm ?? 0,
       };
     }
@@ -264,6 +270,7 @@ export async function getOrderReportRows(filter: OrderingFilter): Promise<OrderR
       shift: header.shift,
       dayNight: normalizeDayNight(header.dayNight),
       truckType: normalizeText(header.truckType),
+      ritaseRequest: header.ritaseRequest ?? 0,
       statusOrder: normalizeText(header.statusOrder),
       cb1tr: metrics.cb1tr,
       cb2tr: metrics.cb2tr,
@@ -272,6 +279,7 @@ export async function getOrderReportRows(filter: OrderingFilter): Promise<OrderR
       cr1tr: metrics.cr1tr,
       remarksJunbikiS2: header.truckType === "JUNBIKI" ? normalizeText(header.remarksOrdering) : "-",
       remarksPalletS2: header.truckType === "PALLET" ? normalizeText(header.remarksOrdering) : "-",
+      remarksGapS2: header.truckType === "GAP" ? normalizeText(header.remarksOrdering) : "-",
       sortDateValue: header.waktuOrder.getTime(),
     };
   });

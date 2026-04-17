@@ -10,7 +10,7 @@ import JunbikiOrderForm from "@/components/ordering/JunbikiOrderForm";
 import PalletOrderForm from "@/components/ordering/PalletOrderForm";
 import AutoSubmitReportFilters from "@/components/shared/AutoSubmitReportFilters";
 import { useRouter } from "next/navigation";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 
 type OrderingReportProps = {
   rows: OrderReportRow[];
@@ -40,6 +40,21 @@ type EditablePalletOrder = {
   }>;
 };
 
+type EditableGapOrder = {
+  orderId: string;
+  truckType: "GAP";
+  kodeOrder: string;
+  tanggalOrder: string;
+  shift: string;
+  dayNight: string;
+  ritaseRequest: number;
+  remarksOrdering: string;
+  items: Array<{
+    itemCode: string;
+    gapRequestQty: number;
+  }>;
+};
+
 type EditableJunbikiOrder = {
   orderId: string;
   truckType: "JUNBIKI";
@@ -59,20 +74,29 @@ type EditableJunbikiOrder = {
   }>;
 };
 
-type EditableOrder = EditablePalletOrder | EditableJunbikiOrder;
+type EditableOrder = EditablePalletOrder | EditableJunbikiOrder | EditableGapOrder;
+
+type GapItemCode = "CB_1TR" | "CB_2TR" | "CAM_01" | "CAM_02" | "CR_1TR";
+
+type GapFormItem = {
+  itemCode: GapItemCode;
+  label: string;
+  currentGap: number;
+  gapRequestQty: number;
+};
 
 const tableColumns: Array<{
   key:
     | keyof OrderReportRow
-    | "cb1trOrder"
+    | "cb1trRequest"
     | "cb1trDelivery"
-    | "cb2trOrder"
+    | "cb2trRequest"
     | "cb2trDelivery"
-    | "camNo01Order"
+    | "camNo01Request"
     | "camNo01Delivery"
-    | "camNo02Order"
+    | "camNo02Request"
     | "camNo02Delivery"
-    | "cr1trOrder"
+    | "cr1trRequest"
     | "cr1trDelivery"
     | "actions";
   label: string;
@@ -82,18 +106,20 @@ const tableColumns: Array<{
   { key: "time", label: "Waktu Order" },
   { key: "code", label: "Kode" },
   { key: "truckType", label: "Truck Type" },
-  { key: "cb1trOrder", label: "Ord CB 1TR", align: "right" },
+  { key: "ritaseRequest", label: "Ritase", align: "right" },
+  { key: "cb1trRequest", label: "Req CB 1TR", align: "right" },
   { key: "cb1trDelivery", label: "Delv CB 1TR", align: "right" },
-  { key: "cb2trOrder", label: "Ord CB 2TR", align: "right" },
+  { key: "cb2trRequest", label: "Req CB 2TR", align: "right" },
   { key: "cb2trDelivery", label: "Delv CB 2TR", align: "right" },
-  { key: "camNo01Order", label: "Ord CA 01", align: "right" },
+  { key: "camNo01Request", label: "Req CA 01", align: "right" },
   { key: "camNo01Delivery", label: "Delv CA 01", align: "right" },
-  { key: "camNo02Order", label: "Ord CA 02", align: "right" },
+  { key: "camNo02Request", label: "Req CA 02", align: "right" },
   { key: "camNo02Delivery", label: "Delv CA 02", align: "right" },
-  { key: "cr1trOrder", label: "Ord CR 1TR", align: "right" },
+  { key: "cr1trRequest", label: "Req CR 1TR", align: "right" },
   { key: "cr1trDelivery", label: "Delv CR 1TR", align: "right" },
   { key: "remarksJunbikiS2", label: "Remarks Junbiki S2" },
   { key: "remarksPalletS2", label: "Remarks Pallet S2" },
+  { key: "remarksGapS2", label: "Remarks Gap S2" },
   { key: "actions", label: "Action" },
 ];
 
@@ -110,11 +136,10 @@ export default function OrderingReport({
   const [loadingEditId, setLoadingEditId] = useState<string | null>(null);
   const [editableOrder, setEditableOrder] = useState<EditableOrder | null>(null);
   const [toast, setToast] = useState<ToastState>(null);
-  const [activeModal, setActiveModal] = useState<"junbiki" | "pallet" | null>(null);
-  const activeRows = rows.filter((row) => {
-    const status = row.statusOrder.toLowerCase();
-    return status === "submitted" || status === "confirmed";
-  });
+  const [activeModal, setActiveModal] = useState<"junbiki" | "pallet" | "gap" | null>(null);
+  const gapItems = buildGapItems(summaries);
+  const activeRows = rows.filter((row) => row.statusOrder.toLowerCase() === "submitted");
+  const deliveryRows = rows.filter((row) => row.statusOrder.toLowerCase() === "confirmed");
   const finishedRows = rows.filter((row) => row.statusOrder.toLowerCase() === "checked");
 
   async function handleDelete(orderId: string) {
@@ -151,7 +176,7 @@ export default function OrderingReport({
       }
 
       setEditableOrder(data);
-      setActiveModal(data.truckType === "JUNBIKI" ? "junbiki" : "pallet");
+      setActiveModal(data.truckType === "JUNBIKI" ? "junbiki" : data.truckType === "GAP" ? "gap" : "pallet");
     } catch (error) {
       const message = error instanceof Error ? error.message : "Terjadi kesalahan";
       setToast({ type: "error", message });
@@ -192,6 +217,14 @@ export default function OrderingReport({
               >
                 Order Pallet
               </button>
+              <button
+                type="button"
+                onClick={() => setActiveModal("gap")}
+                disabled={gapItems.length === 0}
+                className="inline-flex h-11 items-center justify-center rounded-xl border border-amber-300 bg-amber-50 px-4 text-sm font-semibold text-amber-800 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400"
+              >
+                Request Gap
+              </button>
             </div>
           </div>
 
@@ -217,6 +250,16 @@ export default function OrderingReport({
             <div className="mt-4 space-y-3">
               {/* <MetricRow label="Total Stock" value={summary.totalStock} />
               <MetricRow label="Plan Produksi" value={summary.planProduksi} /> */}
+              <MetricRow
+                label="Plan Order"
+                value={summary.planProduksi}
+                valueClassName="text-emerald-600"
+              />
+              <MetricRow
+                label="Remaining Order"
+                value={Math.max(summary.planProduksi - (summary.totalStock - summary.deliveryTotal) - summary.orderTotal, 0)}
+                valueClassName="text-emerald-600"
+              />
               <MetricRow label="Total Order" value={summary.orderTotal} />
               <MetricRow label="Total Delivery" value={summary.deliveryTotal} />
               <MetricRow
@@ -231,7 +274,7 @@ export default function OrderingReport({
 
       <OrderQueueTable
         title="Active Order"
-        description={`Order dengan status Submitted / Confirmed untuk ${formatFilterLabel(selectedFilter)}.`}
+        description={`Order dengan status Submitted untuk ${formatFilterLabel(selectedFilter)}.`}
         rows={activeRows}
         deletingId={deletingId}
         pendingDeleteId={pendingDelete?.orderId ?? null}
@@ -239,6 +282,18 @@ export default function OrderingReport({
         onEdit={handleEdit}
         loadingEditId={loadingEditId}
         showDelivery={false}
+      />
+
+      <OrderQueueTable
+        title="Delivery Order"
+        description={`Order dengan status Confirmed untuk ${formatFilterLabel(selectedFilter)}.`}
+        rows={deliveryRows}
+        deletingId={deletingId}
+        pendingDeleteId={pendingDelete?.orderId ?? null}
+        onRequestDelete={setPendingDelete}
+        onEdit={handleEdit}
+        loadingEditId={loadingEditId}
+        showDelivery
       />
 
       <OrderQueueTable
@@ -312,6 +367,7 @@ export default function OrderingReport({
             embedded
             orderId={editableOrder?.truckType === "PALLET" ? editableOrder.orderId : undefined}
             initialKodeOrder={editableOrder?.truckType === "PALLET" ? editableOrder.kodeOrder : undefined}
+            ritaseProgressDate={editableOrder?.truckType === "PALLET" ? editableOrder.tanggalOrder : selectedFilter.date}
             initialValues={
               editableOrder?.truckType === "PALLET"
                 ? {
@@ -351,6 +407,46 @@ export default function OrderingReport({
         </OrderingModal>
       ) : null}
 
+      {activeModal === "gap" ? (
+        <OrderingModal title="Request Gap" onClose={closeOrderModal} size="compact">
+          <RequestGapForm
+            orderId={editableOrder?.truckType === "GAP" ? editableOrder.orderId : undefined}
+            initialKodeOrder={editableOrder?.truckType === "GAP" ? editableOrder.kodeOrder : undefined}
+            selectedDate={selectedFilter.date}
+            initialValues={
+              editableOrder?.truckType === "GAP"
+                ? {
+                    tanggalOrder: editableOrder.tanggalOrder,
+                    shift: editableOrder.shift,
+                    dayNight: editableOrder.dayNight,
+                    ritaseRequest: editableOrder.ritaseRequest,
+                    remarksOrdering: editableOrder.remarksOrdering,
+                    items: editableOrder.items.map((item) => ({
+                      itemCode: item.itemCode as GapItemCode,
+                      label: GAP_ITEM_LABELS[item.itemCode as GapItemCode] ?? item.itemCode,
+                      currentGap: 0,
+                      gapRequestQty: item.gapRequestQty,
+                    })),
+                  }
+                : {
+                    tanggalOrder: selectedFilter.date,
+                    shift: selectedFilter.shift,
+                    dayNight: selectedFilter.dayNight,
+                    ritaseRequest: 1,
+                    remarksOrdering: "",
+                    items: gapItems,
+                  }
+            }
+            onCancel={closeOrderModal}
+            onSuccess={(kodeOrder) => {
+              closeOrderModal();
+              setToast({ type: "success", message: `Request gap ${kodeOrder} berhasil disimpan` });
+              router.refresh();
+            }}
+          />
+        </OrderingModal>
+      ) : null}
+
       {pendingDelete ? (
         <ConfirmDeleteModal
           order={pendingDelete}
@@ -376,14 +472,17 @@ function OrderingModal({
   title: string;
   children: ReactNode;
   onClose: () => void;
-  size?: "default" | "wide";
+  size?: "compact" | "default" | "wide";
   hideHeader?: boolean;
 }) {
+  const sizeClassName =
+    size === "wide" ? "max-w-[92vw]" : size === "compact" ? "max-w-4xl" : "max-w-[88vw]";
+
   return (
     <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-950/45 px-4 py-6">
       <div
         className={`max-h-[90vh] w-full overflow-y-auto rounded-3xl border border-slate-200 bg-white shadow-2xl ${
-          size === "wide" ? "max-w-[92vw]" : "max-w-[88vw]"
+          sizeClassName
         }`}
       >
         {hideHeader ? null : (
@@ -401,6 +500,252 @@ function OrderingModal({
           </div>
         )}
         <div className={hideHeader ? "px-6 py-6" : "px-6 py-5"}>{children}</div>
+      </div>
+    </div>
+  );
+}
+
+function RequestGapForm({
+  orderId,
+  initialKodeOrder,
+  selectedDate,
+  initialValues,
+  onCancel,
+  onSuccess,
+}: {
+  orderId?: string;
+  initialKodeOrder?: string;
+  selectedDate: string;
+  initialValues: {
+    tanggalOrder: string;
+    shift: string;
+    dayNight: string;
+    ritaseRequest: number;
+    remarksOrdering: string;
+    items: GapFormItem[];
+  };
+  onCancel: () => void;
+  onSuccess: (kodeOrder: string) => void;
+}) {
+  const [form, setForm] = useState(initialValues);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const isEditing = Boolean(orderId);
+
+  useEffect(() => {
+    setForm(initialValues);
+  }, [initialValues]);
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const activeItems = form.items.filter((item) => item.gapRequestQty > 0);
+    if (activeItems.length === 0) {
+      setError("Minimal satu item gap harus diisi");
+      return;
+    }
+
+    try {
+      setSaving(true);
+      setError("");
+
+      const response = await fetch(isEditing && orderId ? `/api/ordering/${orderId}` : "/api/ordering/gap", {
+        method: isEditing ? "PUT" : "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          tanggalOrder: form.tanggalOrder || selectedDate,
+          shift: form.shift,
+          dayNight: form.dayNight,
+          ritaseRequest: form.ritaseRequest,
+          remarksOrdering: form.remarksOrdering,
+          items: form.items.map((item) => ({
+            itemCode: item.itemCode,
+            gapRequestQty: item.gapRequestQty,
+          })),
+        }),
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error ?? "Gagal menyimpan request gap");
+      }
+
+      onSuccess(data.kodeOrder ?? initialKodeOrder ?? "GAP");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Terjadi kesalahan");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function updateItem(itemCode: GapItemCode, gapRequestQty: number) {
+    setForm((current) => ({
+      ...current,
+      items: current.items.map((item) =>
+        item.itemCode === itemCode ? { ...item, gapRequestQty: Math.max(0, Math.round(gapRequestQty || 0)) } : item
+      ),
+    }));
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-5">
+      <div>
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-700">
+          {isEditing ? "Edit Request Gap" : "Request Gap"}
+        </p>
+        <h2 className="mt-2 text-2xl font-bold text-slate-900">
+          {initialKodeOrder ? `Request Gap ${initialKodeOrder}` : "Request Gap Baru"}
+        </h2>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <Field label="Tanggal Order">
+          <input
+            type="date"
+            value={form.tanggalOrder}
+            onChange={(event) => setForm((current) => ({ ...current, tanggalOrder: event.target.value }))}
+            className="h-11 w-full rounded-xl border border-slate-300 px-3 text-sm outline-none transition focus:border-sky-500"
+          />
+        </Field>
+        <SelectField
+          label="Shift"
+          value={form.shift}
+          placeholder="Pilih Shift"
+          options={["RED", "WHITE"]}
+          onChange={(value) => setForm((current) => ({ ...current, shift: value }))}
+        />
+        <SelectField
+          label="Day / Night"
+          value={form.dayNight}
+          placeholder="Pilih Day / Night"
+          options={["DAY", "NIGHT"]}
+          onChange={(value) => setForm((current) => ({ ...current, dayNight: value }))}
+        />
+        <SelectField
+          label="Ritase Request"
+          value={String(form.ritaseRequest)}
+          options={Array.from({ length: 20 }, (_, index) => String(index + 1))}
+          onChange={(value) =>
+            setForm((current) => ({ ...current, ritaseRequest: Math.max(1, Number(value) || 1) }))
+          }
+        />
+      </div>
+
+      <div className="overflow-hidden rounded-2xl border border-slate-200">
+        <table className="min-w-full border-collapse text-sm">
+          <thead className="bg-slate-100/90 text-slate-700">
+            <tr>
+              <th className="border-b border-slate-200 px-4 py-3 text-left font-semibold">Item</th>
+              <th className="border-b border-slate-200 px-4 py-3 text-right font-semibold">Gap Saat Ini</th>
+              <th className="border-b border-slate-200 px-4 py-3 text-right font-semibold">Qty Gap Request</th>
+            </tr>
+          </thead>
+          <tbody>
+            {form.items.map((item) => (
+              <tr key={item.itemCode} className="odd:bg-white even:bg-slate-50/60">
+                <td className="border-b border-slate-200 px-4 py-3">
+                  <p className="font-semibold text-slate-900">{item.itemCode}</p>
+                  <p className="text-xs text-slate-500">{item.label}</p>
+                </td>
+                <td className="border-b border-slate-200 px-4 py-3 text-right font-semibold text-rose-600">
+                  {item.currentGap ? formatNumber(item.currentGap) : "-"}
+                </td>
+                <td className="border-b border-slate-200 px-4 py-3 text-right">
+                  <input
+                    type="number"
+                    min={0}
+                    inputMode="numeric"
+                    value={item.gapRequestQty}
+                    onChange={(event) => updateItem(item.itemCode, Number(event.target.value))}
+                    className="ml-auto block h-11 w-32 rounded-xl border border-slate-300 px-3 text-right text-sm outline-none transition focus:border-sky-500"
+                  />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <Field label="Remarks Ordering">
+        <textarea
+          value={form.remarksOrdering}
+          onChange={(event) => setForm((current) => ({ ...current, remarksOrdering: event.target.value }))}
+          className="min-h-24 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-sky-500"
+        />
+      </Field>
+
+      {error ? (
+        <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+          {error}
+        </div>
+      ) : null}
+
+      <div className="flex justify-end gap-3 border-t border-slate-200 pt-5">
+        <button
+          type="button"
+          onClick={onCancel}
+          disabled={saving}
+          className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-60"
+        >
+          Batal
+        </button>
+        <button
+          type="submit"
+          disabled={saving}
+          className="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:opacity-60"
+        >
+          {saving ? "Menyimpan..." : isEditing ? "Simpan Perubahan" : "Submit Request Gap"}
+        </button>
+      </div>
+    </form>
+  );
+}
+
+function Field({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <label className="block">
+      <span className="mb-1 block text-sm font-medium text-slate-700">{label}</span>
+      {children}
+    </label>
+  );
+}
+
+function SelectField({
+  label,
+  value,
+  options,
+  placeholder,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  options: string[];
+  placeholder?: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div>
+      <label className="mb-1 block text-sm font-medium text-slate-700">{label}</label>
+      <div className="relative">
+        <select
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          className="h-11 w-full appearance-none rounded-xl border border-slate-300 bg-white px-3 pr-12 text-sm outline-none transition focus:border-sky-500"
+        >
+          {placeholder ? <option value="">{placeholder}</option> : null}
+          {options.map((option) => (
+            <option key={option} value={option}>
+              {option}
+            </option>
+          ))}
+        </select>
+        <span className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-slate-400">
+          <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8">
+            <path d="m5 7.5 5 5 5-5" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </span>
       </div>
     </div>
   );
@@ -467,29 +812,33 @@ function OrderQueueTable({
                   <td className="border-b border-slate-200 px-4 py-3 whitespace-nowrap text-slate-700">{row.time}</td>
                   <td className="border-b border-slate-200 px-4 py-3 whitespace-nowrap font-medium text-slate-900">{row.code}</td>
                   <td className="border-b border-slate-200 px-4 py-3 whitespace-nowrap text-slate-700">{row.truckType}</td>
-                  <NumericCell value={row.cb1tr.order} />
+                  <NumericCell value={row.ritaseRequest} />
+                  <NumericCell value={getOrderRequestQty(row, "cb1tr")} />
                   {showDelivery ? <NumericCell value={row.cb1tr.delivery} /> : null}
-                  <NumericCell value={row.cb2tr.order} />
+                  <NumericCell value={getOrderRequestQty(row, "cb2tr")} />
                   {showDelivery ? <NumericCell value={row.cb2tr.delivery} /> : null}
-                  <NumericCell value={row.camNo01.order} />
+                  <NumericCell value={getOrderRequestQty(row, "camNo01")} />
                   {showDelivery ? <NumericCell value={row.camNo01.delivery} /> : null}
-                  <NumericCell value={row.camNo02.order} />
+                  <NumericCell value={getOrderRequestQty(row, "camNo02")} />
                   {showDelivery ? <NumericCell value={row.camNo02.delivery} /> : null}
-                  <NumericCell value={row.cr1tr.order} />
+                  <NumericCell value={getOrderRequestQty(row, "cr1tr")} />
                   {showDelivery ? <NumericCell value={row.cr1tr.delivery} /> : null}
                   <RemarksCell value={row.remarksJunbikiS2} />
                   <RemarksCell value={row.remarksPalletS2} />
+                  <RemarksCell value={row.remarksGapS2} />
                   <td className="border-b border-slate-200 px-4 py-3 whitespace-nowrap">
                     {row.statusOrder.toLowerCase() === "submitted" ? (
                       <div className="flex gap-2">
-                        <button
-                          type="button"
-                          onClick={() => onEdit(row)}
-                          disabled={loadingEditId === row.orderId || deletingId === row.orderId}
-                          className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                          {loadingEditId === row.orderId ? "Membuka..." : "Edit"}
-                        </button>
+                        {row.truckType === "GAP" ? null : (
+                          <button
+                            type="button"
+                            onClick={() => onEdit(row)}
+                            disabled={loadingEditId === row.orderId || deletingId === row.orderId}
+                            className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            {loadingEditId === row.orderId ? "Membuka..." : "Edit"}
+                          </button>
+                        )}
                         <button
                           type="button"
                           onClick={() => onRequestDelete(row)}
@@ -587,6 +936,10 @@ function NumericCell({ value }: { value: number }) {
   );
 }
 
+function getOrderRequestQty(row: OrderReportRow, key: OrderItemSummary["key"]) {
+  return row.truckType === "GAP" ? row[key].gapRequest ?? 0 : row[key].order;
+}
+
 function RemarksCell({ value }: { value: string }) {
   return (
     <td className="border-b border-slate-200 px-4 py-3 text-left text-slate-700">
@@ -611,6 +964,36 @@ function formatDateOption(value: string) {
 
 function formatNumber(value: number) {
   return new Intl.NumberFormat("id-ID").format(value);
+}
+
+const GAP_ITEM_LABELS: Record<GapItemCode, string> = {
+  CB_1TR: "Cylinder Block 1TR",
+  CB_2TR: "Cylinder Block 2TR",
+  CAM_01: "Camshaft No. 01",
+  CAM_02: "Camshaft No. 02",
+  CR_1TR: "Crankshaft 1TR",
+};
+
+const SUMMARY_KEY_TO_GAP_ITEM: Record<OrderItemSummary["key"], GapItemCode> = {
+  cb1tr: "CB_1TR",
+  cb2tr: "CB_2TR",
+  camNo01: "CAM_01",
+  camNo02: "CAM_02",
+  cr1tr: "CR_1TR",
+};
+
+function buildGapItems(summaries: OrderItemSummary[]): GapFormItem[] {
+  return summaries
+    .filter((summary) => summary.gap < 0)
+    .map((summary) => {
+      const itemCode = SUMMARY_KEY_TO_GAP_ITEM[summary.key];
+      return {
+        itemCode,
+        label: GAP_ITEM_LABELS[itemCode],
+        currentGap: summary.gap,
+        gapRequestQty: Math.abs(summary.gap),
+      };
+    });
 }
 
 const MONTH_NAMES_FULL = [

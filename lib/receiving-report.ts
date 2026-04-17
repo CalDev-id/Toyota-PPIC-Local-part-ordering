@@ -51,6 +51,7 @@ export type ReceivingOrderItem = {
   itemCode: string;
   itemName: string;
   qtyOrder: number;
+  gapRequestQty: number;
   qtyConfirm: number;
   qtyReceived: number;
   remarksDelivery: string;
@@ -93,6 +94,7 @@ export async function getReceivingPageData(filter: OrderingFilter): Promise<Rece
           itemCode: true,
           itemName: true,
           qtyOrder: true,
+          gapRequestQty: true,
           qtyConfirm: true,
           qtyReceived: true,
           remarksDelivery: true,
@@ -116,6 +118,7 @@ export async function getReceivingPageData(filter: OrderingFilter): Promise<Rece
 
       metrics[metricKey] = {
         order: detail.qtyOrder ?? 0,
+        gapRequest: detail.gapRequestQty ?? 0,
         delivery: detail.qtyConfirm ?? 0,
         received: detail.qtyReceived ?? 0,
       };
@@ -137,6 +140,7 @@ export async function getReceivingPageData(filter: OrderingFilter): Promise<Rece
         itemCode: normalizeText(detail.itemCode),
         itemName: normalizeText(detail.itemName),
         qtyOrder: detail.qtyOrder ?? 0,
+        gapRequestQty: detail.gapRequestQty ?? 0,
         qtyConfirm: detail.qtyConfirm ?? 0,
         qtyReceived: detail.qtyReceived ?? 0,
         remarksDelivery: detail.remarksDelivery?.trim() || "",

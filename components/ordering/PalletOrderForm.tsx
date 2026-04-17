@@ -35,6 +35,7 @@ type PalletOrderFormProps = {
   orderId?: string;
   initialValues?: PalletFormState | null;
   initialKodeOrder?: string;
+  ritaseProgressDate?: string;
   onSuccess?: (kodeOrder: string) => void;
   onCancel?: () => void;
 };
@@ -70,6 +71,7 @@ export default function PalletOrderForm({
   orderId,
   initialValues,
   initialKodeOrder,
+  ritaseProgressDate,
   onSuccess,
   onCancel,
 }: PalletOrderFormProps) {
@@ -113,6 +115,7 @@ export default function PalletOrderForm({
 
   const todayDate = useMemo(() => formatDateInput(new Date()), []);
   const todayLabel = useMemo(() => formatDateLabel(new Date()), []);
+  const progressDate = ritaseProgressDate || todayDate;
 
   function showToast(type: "success" | "error", message: string) {
     if (toastTimeoutRef.current) {
@@ -203,10 +206,10 @@ export default function PalletOrderForm({
     }
 
     const controller = new AbortController();
-    void loadRitaseProgress(todayDate, form.dayNight, controller.signal);
+    void loadRitaseProgress(progressDate, form.dayNight, controller.signal);
 
     return () => controller.abort();
-  }, [todayDate, form.dayNight, loadRitaseProgress]);
+  }, [progressDate, form.dayNight, loadRitaseProgress]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -480,7 +483,7 @@ function OrderItemRow({
           {badgeLabel ? <Badge label={badgeLabel} color={badgeColor} /> : null}
         </div>
         <p className="text-xs font-medium uppercase tracking-[0.12em] text-slate-500">
-          Plan: {loadingPlans ? "Memuat..." : formatNumber(planValue)}
+          Order Need: {loadingPlans ? "Memuat..." : formatNumber(planValue)}
         </p>
       </div>
 

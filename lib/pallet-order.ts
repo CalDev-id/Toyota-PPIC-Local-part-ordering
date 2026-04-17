@@ -83,20 +83,59 @@ export async function getPalletPlanningMetrics(
   dayNight: string,
   date = new Date()
 ): Promise<PalletPlanMetrics> {
-  const planning = await prisma.dailyPlanning.findFirst({
-    where: {
-      tanggal: new Date(`${formatDateInput(date)}T00:00:00.000Z`),
-      shift,
-      dayNight: dayNight || null,
-    },
-  });
+  const orderDate = new Date(`${formatDateInput(date)}T00:00:00.000Z`);
+  const [planning, orderTotals] = await Promise.all([
+    prisma.dailyPlanning.findFirst({
+      where: {
+        tanggal: orderDate,
+        shift,
+        dayNight: dayNight || null,
+      },
+    }),
+    prisma.orderDetail.groupBy({
+      by: ["itemCode"],
+      where: {
+        itemCode: { in: PALLET_ITEM_DEFINITIONS.map((definition) => definition.code) },
+        order: {
+          kodeOrder: { startsWith: "ORD-" },
+          tanggalOrder: orderDate,
+          shift,
+          dayNight: dayNight || null,
+        },
+      },
+      _sum: {
+        qtyOrder: true,
+      },
+    }),
+  ]);
 
-  return {
+  const totalOrderByItem = orderTotals.reduce<Partial<Record<PalletOrderItemCode, number>>>((acc, item) => {
+    acc[item.itemCode as PalletOrderItemCode] = item._sum.qtyOrder ?? 0;
+    return acc;
+  }, {});
+
+  const stockAwalByItem: PalletPlanMetrics = {
+    CB_1TR: (planning?.stockAwalJunbikiCb1tr ?? 0) + (planning?.stockAwalEmergencyCb1tr ?? 0),
+    CB_2TR: (planning?.stockAwalJunbikiCb2tr ?? 0) + (planning?.stockAwalEmergencyCb2tr ?? 0),
+    CR_1TR: planning?.stockAwalEmergencyCr1tr ?? 0,
+    CAM_01: planning?.stockAwalEmergencyCam01 ?? 0,
+    CAM_02: planning?.stockAwalEmergencyCam02 ?? 0,
+  };
+
+  const planByItem: PalletPlanMetrics = {
     CB_1TR: planning?.planProdCb1tr ?? 0,
     CB_2TR: planning?.planProdCb2tr ?? 0,
     CR_1TR: planning?.planProdCr1tr ?? 0,
     CAM_01: planning?.planProdCam01 ?? 0,
     CAM_02: planning?.planProdCam02 ?? 0,
+  };
+
+  return {
+    CB_1TR: Math.max(planByItem.CB_1TR - stockAwalByItem.CB_1TR - (totalOrderByItem.CB_1TR ?? 0), 0),
+    CB_2TR: Math.max(planByItem.CB_2TR - stockAwalByItem.CB_2TR - (totalOrderByItem.CB_2TR ?? 0), 0),
+    CR_1TR: Math.max(planByItem.CR_1TR - stockAwalByItem.CR_1TR - (totalOrderByItem.CR_1TR ?? 0), 0),
+    CAM_01: Math.max(planByItem.CAM_01 - stockAwalByItem.CAM_01 - (totalOrderByItem.CAM_01 ?? 0), 0),
+    CAM_02: Math.max(planByItem.CAM_02 - stockAwalByItem.CAM_02 - (totalOrderByItem.CAM_02 ?? 0), 0),
   };
 }
 

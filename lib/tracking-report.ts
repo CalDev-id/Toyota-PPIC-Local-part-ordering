@@ -76,6 +76,7 @@ export async function getTrackingPageData(filter: OrderingFilter): Promise<Track
         select: {
           itemCode: true,
           qtyOrder: true,
+          gapRequestQty: true,
           qtyConfirm: true,
           qtyReceived: true,
         },
@@ -106,6 +107,7 @@ export async function getTrackingPageData(filter: OrderingFilter): Promise<Track
 
       metrics[metricKey] = {
         order: qtyOrder,
+        gapRequest: detail.gapRequestQty ?? 0,
         delivery: qtyConfirm,
         received: qtyReceived,
       };

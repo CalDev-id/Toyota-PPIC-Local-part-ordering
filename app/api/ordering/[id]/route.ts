@@ -4,6 +4,11 @@ import {
   validatePalletOrderInput,
 } from "@/lib/pallet-order";
 import {
+  buildGapRemark,
+  normalizeGapOrderPayload,
+  validateGapOrderInput,
+} from "@/lib/gap-order";
+import {
   normalizeJunbikiOrderPayload,
   validateJunbikiOrderInput,
   type JunbikiOrderSection,
@@ -20,6 +25,20 @@ type RouteContext = {
 };
 
 type EditableOrderResponse =
+  | {
+      orderId: string;
+      truckType: "GAP";
+      kodeOrder: string;
+      tanggalOrder: string;
+      shift: string;
+      dayNight: string;
+      ritaseRequest: number;
+      remarksOrdering: string;
+      items: Array<{
+        itemCode: string;
+        gapRequestQty: number;
+      }>;
+    }
   | {
       orderId: string;
       truckType: "PALLET";
@@ -203,6 +222,40 @@ export async function PUT(req: Request, context: RouteContext) {
           },
         }),
       ]);
+    } else if (order.truckType === "GAP") {
+      const input = normalizeGapOrderPayload(payload);
+      const validationMessage = validateGapOrderInput(input);
+
+      if (validationMessage) {
+        return NextResponse.json({ error: validationMessage }, { status: 400 });
+      }
+
+      const itemsByCode = new Map<string, number>(input.items.map((item) => [item.itemCode, item.gapRequestQty]));
+
+      await prisma.$transaction([
+        prisma.orderHeader.update({
+          where: { orderId: id },
+          data: {
+            tanggalOrder: new Date(`${input.tanggalOrder}T00:00:00.000Z`),
+            shift: input.shift,
+            dayNight: input.dayNight,
+            ritaseRequest: input.ritaseRequest,
+            remarksOrdering: input.remarksOrdering || buildGapRemark(input.items),
+            updatedBy: userLabel,
+            updatedAt: now,
+          },
+        }),
+        ...order.details.map((detail) =>
+          prisma.orderDetail.update({
+            where: { detailId: detail.detailId },
+            data: {
+              qtyOrder: 0,
+              gapRequestQty: itemsByCode.get(detail.itemCode) ?? 0,
+              updatedAt: now,
+            },
+          })
+        ),
+      ]);
     } else {
       return NextResponse.json({ error: "Truck type order tidak didukung untuk edit" }, { status: 400 });
     }
@@ -267,11 +320,12 @@ function buildEditableOrderResponse(order: {
   ratioCb2tr: number;
   remarksOrdering: string | null;
   shellStateCb1tr: string | null;
-  shellStateCb2tr: string | null;
-  details: Array<{
-    itemCode: string;
-    qtyOrder: number;
-  }>;
+    shellStateCb2tr: string | null;
+    details: Array<{
+      itemCode: string;
+      qtyOrder: number;
+      gapRequestQty: number;
+    }>;
 }): EditableOrderResponse {
   if (order.truckType === "JUNBIKI") {
     return {
@@ -289,6 +343,23 @@ function buildEditableOrderResponse(order: {
         ...parseShellState(order.shellStateCb1tr, "CB_1TR"),
         ...parseShellState(order.shellStateCb2tr, "CB_2TR"),
       ],
+    };
+  }
+
+  if (order.truckType === "GAP") {
+    return {
+      orderId: order.orderId,
+      truckType: "GAP",
+      kodeOrder: order.kodeOrder,
+      tanggalOrder: order.tanggalOrder.toISOString().slice(0, 10),
+      shift: order.shift,
+      dayNight: order.dayNight ?? "",
+      ritaseRequest: order.ritaseRequest ?? 0,
+      remarksOrdering: order.remarksOrdering ?? "",
+      items: order.details.map((detail) => ({
+        itemCode: detail.itemCode,
+        gapRequestQty: detail.gapRequestQty ?? 0,
+      })),
     };
   }
 

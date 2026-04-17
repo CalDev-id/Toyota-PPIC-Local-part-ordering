@@ -297,10 +297,10 @@ function QueueTable({
                 ))}
                 {metricColumns.map((column) => (
                   <th
-                    key={`${column.key}-order`}
+                    key={`${column.key}-request`}
                     className="border-b border-slate-200 px-4 py-3 text-right font-semibold whitespace-nowrap"
                   >
-                    {column.orderLabel}
+                    {column.requestLabel}
                   </th>
                 ))}
                 {showDelivery
@@ -333,7 +333,10 @@ function QueueTable({
                   <TextCell value={row.truckType} />
                   <NumericCell value={row.ritaseRequest} />
                   {metricColumns.map((column) => (
-                    <NumericCell key={`${row.orderId}-${column.key}-order`} value={row[column.key].order} />
+                    <NumericCell
+                      key={`${row.orderId}-${column.key}-request`}
+                      value={getRequestQty(row, column.key)}
+                    />
                   ))}
                   {showDelivery
                     ? metricColumns.map((column) => (
@@ -447,7 +450,9 @@ function ConfirmDeliveryModal({
                 <tr>
                   <th className="border-b border-slate-200 px-4 py-3 text-left font-semibold">Item Code</th>
                   <th className="border-b border-slate-200 px-4 py-3 text-left font-semibold">Item Name</th>
-                  <th className="border-b border-slate-200 px-4 py-3 text-right font-semibold">Qty Order</th>
+                  <th className="border-b border-slate-200 px-4 py-3 text-right font-semibold">
+                    {order.truckType === "GAP" ? "Qty Gap" : "Qty Order"}
+                  </th>
                   <th className="border-b border-slate-200 px-4 py-3 text-right font-semibold">Qty Confirm</th>
                 </tr>
               </thead>
@@ -457,7 +462,7 @@ function ConfirmDeliveryModal({
                     <td className="border-b border-slate-200 px-4 py-3 font-medium text-slate-900">{item.itemCode}</td>
                     <td className="border-b border-slate-200 px-4 py-3 text-slate-700">{item.itemName}</td>
                     <td className="border-b border-slate-200 px-4 py-3 text-right text-slate-700">
-                      {formatNumber(item.qtyOrder)}
+                      {formatNumber(order.truckType === "GAP" ? item.gapRequestQty : item.qtyOrder)}
                     </td>
                     <td className="border-b border-slate-200 px-4 py-3 text-right">
                       <input
@@ -599,15 +604,19 @@ const baseColumns: Array<{ key: keyof DeliveryQueueRow; label: string; align?: "
 
 const metricColumns: Array<{
   key: DeliveryMetricKey;
-  orderLabel: string;
+  requestLabel: string;
   deliveryLabel: string;
 }> = [
-  { key: "cb1tr", orderLabel: "Ord CB 1TR", deliveryLabel: "Delv CB 1TR" },
-  { key: "cb2tr", orderLabel: "Ord CB 2TR", deliveryLabel: "Delv CB 2TR" },
-  { key: "camNo01", orderLabel: "Ord CA 01", deliveryLabel: "Delv CA 01" },
-  { key: "camNo02", orderLabel: "Ord CA 02", deliveryLabel: "Delv CA 02" },
-  { key: "cr1tr", orderLabel: "Ord CR 1TR", deliveryLabel: "Delv CR 1TR" },
+  { key: "cb1tr", requestLabel: "Req CB 1TR", deliveryLabel: "Delv CB 1TR" },
+  { key: "cb2tr", requestLabel: "Req CB 2TR", deliveryLabel: "Delv CB 2TR" },
+  { key: "camNo01", requestLabel: "Req CA 01", deliveryLabel: "Delv CA 01" },
+  { key: "camNo02", requestLabel: "Req CA 02", deliveryLabel: "Delv CA 02" },
+  { key: "cr1tr", requestLabel: "Req CR 1TR", deliveryLabel: "Delv CR 1TR" },
 ];
+
+function getRequestQty(row: DeliveryQueueRow, key: DeliveryMetricKey) {
+  return row.truckType === "GAP" ? row[key].gapRequest ?? 0 : row[key].order;
+}
 
 function SummaryCard({
   label,

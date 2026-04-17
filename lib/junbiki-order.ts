@@ -29,6 +29,8 @@ export type JunbikiOrderCreateResult = {
   detailCount: number;
 };
 
+export type JunbikiOrderNeedMetrics = Record<JunbikiOrderSection, number>;
+
 type NormalizedJunbikiShell = JunbikiSelectedShellInput;
 
 const VALID_SHELL_STATUSES: JunbikiOrderShellStatus[] = ["idle", "active", "blocked"];
@@ -151,6 +153,60 @@ export function buildJunbikiOrderData(input: JunbikiOrderInput, userLabel: strin
       createdAt: now,
       updatedAt: now,
     })),
+  };
+}
+
+export async function getJunbikiOrderNeedMetrics(
+  date: string,
+  shift: string,
+  dayNight: string,
+  excludeOrderId?: string
+): Promise<JunbikiOrderNeedMetrics> {
+  const orderDate = new Date(`${date}T00:00:00.000Z`);
+  const [planning, orderTotals] = await Promise.all([
+    prisma.dailyPlanning.findFirst({
+      where: {
+        tanggal: orderDate,
+        shift,
+        dayNight: dayNight || null,
+      },
+    }),
+    prisma.orderDetail.groupBy({
+      by: ["itemCode"],
+      where: {
+        itemCode: { in: ["CB_1TR", "CB_2TR"] },
+        order: {
+          orderId: excludeOrderId ? { not: excludeOrderId } : undefined,
+          kodeOrder: { startsWith: "ORD-" },
+          tanggalOrder: orderDate,
+          shift,
+          dayNight: dayNight || null,
+        },
+      },
+      _sum: {
+        qtyOrder: true,
+      },
+    }),
+  ]);
+
+  const totalOrderByItem = orderTotals.reduce<Partial<Record<JunbikiOrderSection, number>>>((acc, item) => {
+    acc[item.itemCode as JunbikiOrderSection] = item._sum.qtyOrder ?? 0;
+    return acc;
+  }, {});
+
+  const stockAwalByItem: JunbikiOrderNeedMetrics = {
+    CB_1TR: (planning?.stockAwalJunbikiCb1tr ?? 0) + (planning?.stockAwalEmergencyCb1tr ?? 0),
+    CB_2TR: (planning?.stockAwalJunbikiCb2tr ?? 0) + (planning?.stockAwalEmergencyCb2tr ?? 0),
+  };
+
+  const planByItem: JunbikiOrderNeedMetrics = {
+    CB_1TR: planning?.planProdCb1tr ?? 0,
+    CB_2TR: planning?.planProdCb2tr ?? 0,
+  };
+
+  return {
+    CB_1TR: Math.max(planByItem.CB_1TR - stockAwalByItem.CB_1TR - (totalOrderByItem.CB_1TR ?? 0), 0),
+    CB_2TR: Math.max(planByItem.CB_2TR - stockAwalByItem.CB_2TR - (totalOrderByItem.CB_2TR ?? 0), 0),
   };
 }
 

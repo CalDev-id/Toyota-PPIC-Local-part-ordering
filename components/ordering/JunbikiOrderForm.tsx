@@ -64,6 +64,11 @@ type RitaseProgressState = {
   schedule: RitaseScheduleItem[];
 };
 
+type OrderNeedState = {
+  loading: boolean;
+  values: Record<ShellSectionKey, number>;
+};
+
 type JunbikiOrderFormProps = {
   orderId?: string;
   initialValues?: {
@@ -145,6 +150,10 @@ export default function JunbikiOrderForm({
     nextRitase: null,
     schedule: [],
   });
+  const [orderNeed, setOrderNeed] = useState<OrderNeedState>({
+    loading: false,
+    values: { CB_1TR: 0, CB_2TR: 0 },
+  });
   const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isEditing = Boolean(orderId);
 
@@ -225,6 +234,49 @@ export default function JunbikiOrderForm({
     }
   }, [orderId]);
 
+  const loadOrderNeed = useCallback(async (
+    date: string,
+    shift: Shift,
+    dayNight: DayNight,
+    signal: AbortSignal
+  ) => {
+    setOrderNeed((current) => ({ ...current, loading: true }));
+
+    try {
+      const params = new URLSearchParams({ date, shift, dayNight });
+      if (orderId) {
+        params.set("excludeOrderId", orderId);
+      }
+
+      const response = await fetch(`/api/ordering/junbiki?${params.toString()}`, {
+        cache: "no-store",
+        signal,
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error ?? "Gagal mengambil order need Junbiki");
+      }
+
+      setOrderNeed({
+        loading: false,
+        values: {
+          CB_1TR: data.orderNeeds?.CB_1TR ?? 0,
+          CB_2TR: data.orderNeeds?.CB_2TR ?? 0,
+        },
+      });
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") {
+        return;
+      }
+
+      setOrderNeed({
+        loading: false,
+        values: { CB_1TR: 0, CB_2TR: 0 },
+      });
+    }
+  }, [orderId]);
+
   useEffect(() => {
     if (!header.tanggal_order || !header.day_night) {
       setRitaseProgress({
@@ -241,6 +293,21 @@ export default function JunbikiOrderForm({
 
     return () => controller.abort();
   }, [header.tanggal_order, header.day_night, loadRitaseProgress]);
+
+  useEffect(() => {
+    if (!header.tanggal_order || !header.shift || !header.day_night) {
+      setOrderNeed({
+        loading: false,
+        values: { CB_1TR: 0, CB_2TR: 0 },
+      });
+      return;
+    }
+
+    const controller = new AbortController();
+    void loadOrderNeed(header.tanggal_order, header.shift, header.day_night, controller.signal);
+
+    return () => controller.abort();
+  }, [header.tanggal_order, header.shift, header.day_night, loadOrderNeed]);
 
   function handleToggleShell(shell: ShellItem) {
     const currentStatus = shellStatuses[shell.code] ?? "idle";
@@ -334,6 +401,8 @@ export default function JunbikiOrderForm({
             shells={SHELL_SECTIONS.CB_1TR}
             shellStatuses={shellStatuses}
             selectedQty={summary.qtyCb1tr}
+            orderNeed={orderNeed.values.CB_1TR}
+            loadingOrderNeed={orderNeed.loading}
             onToggleShell={handleToggleShell}
           />
           <ShellGridSection
@@ -341,6 +410,8 @@ export default function JunbikiOrderForm({
             shells={SHELL_SECTIONS.CB_2TR}
             shellStatuses={shellStatuses}
             selectedQty={summary.qtyCb2tr}
+            orderNeed={orderNeed.values.CB_2TR}
+            loadingOrderNeed={orderNeed.loading}
             onToggleShell={handleToggleShell}
           />
         </div>
@@ -493,12 +564,16 @@ function ShellGridSection({
   shells,
   shellStatuses,
   selectedQty,
+  orderNeed,
+  loadingOrderNeed,
   onToggleShell,
 }: {
   section: ShellSectionKey;
   shells: ShellItem[];
   shellStatuses: ShellStatusMap;
   selectedQty: number;
+  orderNeed: number;
+  loadingOrderNeed: boolean;
   onToggleShell: (shell: ShellItem) => void;
 }) {
   const sectionMeta = SECTION_META[section];
@@ -506,12 +581,18 @@ function ShellGridSection({
 
   return (
     <section className={`rounded-3xl border border-slate-200 bg-gradient-to-br bg-white p-5 shadow-sm transition ${sectionMeta.accentClassName}`}>
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex flex-wrap items-center gap-3">
           <h3 className="text-lg font-bold text-slate-900">{sectionMeta.title}</h3>
           <div className="rounded-xl border border-slate-200 bg-white/90 px-3 py-1.5 text-sm text-slate-600">
             <span className="font-semibold text-slate-900">{formatNumber(selectedQty)}</span> pcs
           </div>
+        </div>
+        <div className="w-fit rounded-xl border border-slate-200 bg-white/90 px-3 py-1.5 text-sm text-slate-600 sm:ml-auto">
+          Order Need:{" "}
+          <span className="font-semibold text-slate-900">
+            {loadingOrderNeed ? "Memuat..." : formatNumber(orderNeed)}
+          </span>
         </div>
       </div>
 

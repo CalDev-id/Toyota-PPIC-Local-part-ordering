@@ -29,6 +29,7 @@ export async function GET(req: Request) {
       where: {
         tanggalOrder: new Date(`${date}T00:00:00.000Z`),
         dayNight,
+        requestType: "ORDER",
         ...(excludeOrderId ? { orderId: { not: excludeOrderId } } : {}),
       },
     });
