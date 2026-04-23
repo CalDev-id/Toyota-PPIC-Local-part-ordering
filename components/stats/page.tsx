@@ -1,48 +1,22 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 
-import DefaultLayout from "@/components/Layout/DefaultLayout";
 import BarComparisonChart from "@/components/charts/BarComparisonChart";
 import LineTrendChart from "@/components/charts/LineTrendChart";
+import type { ItemRow } from "@/components/items/page";
 
-type ItemRow = {
-  id: number;
-  name: string;
-  qty: number;
-  status: string;
-  price: number;
+type ItemStatsPageProps = {
+  rows: ItemRow[];
+  loading?: boolean;
+  error?: string;
 };
 
-export default function ItemStatsPage() {
-  const [rows, setRows] = useState<ItemRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-
-  useEffect(() => {
-    fetchRows();
-  }, []);
-
-  async function fetchRows() {
-    try {
-      setLoading(true);
-      setError("");
-
-      const res = await fetch("/api/items", { cache: "no-store" });
-
-      if (!res.ok) {
-        throw new Error("Gagal ambil data item");
-      }
-
-      const data: ItemRow[] = await res.json();
-      setRows(data);
-    } catch (err) {
-      console.error(err);
-      setError("Data item tidak bisa dimuat");
-    } finally {
-      setLoading(false);
-    }
-  }
+export default function ItemStatsPage({
+  rows,
+  loading = false,
+  error = "",
+}: ItemStatsPageProps) {
 
   const totalQty = useMemo(
     () => rows.reduce((sum, row) => sum + row.qty, 0),

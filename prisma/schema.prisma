@@ -16,3 +16,161 @@ model items {
   updated_at DateTime? @default(now()) @db.Timestamp(6)
   price      Int?      @default(0)
 }
+
+model User {
+  id          String @id @default(cuid())
+  name        String?
+  email       String @unique
+  phoneNumber String?
+  password    String
+  role        Role   @default(ORDERING)
+
+  accounts Account[]
+  notificationRecipients NotificationRecipient[]
+  sessions Session[]
+}
+
+enum Role {
+  ADMIN
+  ORDERING
+  RECEIVING
+  DELIVERY
+}
+
+enum NotificationType {
+  ORDER_CREATED
+  DELIVERY_CONFIRMED
+  RECEIVING_CHECKED
+}
+
+model Account {
+  id                 String @id @default(cuid())
+  userId             String
+  type               String
+  provider           String
+  providerAccountId  String
+  refresh_token      String?
+  access_token       String?
+  expires_at         Int?
+  token_type         String?
+  scope              String?
+  id_token           String?
+  session_state      String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model DailyPlanning {
+  planId                     String    @id @map("plan_id")
+  tanggal                    DateTime  @db.Date
+  shift                      String
+  dayNight                   String?   @map("day_night")
+  stockAwalJunbikiCb1tr      Int       @default(0) @map("stock_awal_junbiki_cb_1tr")
+  stockAwalJunbikiCb2tr      Int       @default(0) @map("stock_awal_junbiki_cb_2tr")
+  stockAwalEmergencyCb1tr    Int       @default(0) @map("stock_awal_emergency_cb_1tr")
+  stockAwalEmergencyCb2tr    Int       @default(0) @map("stock_awal_emergency_cb_2tr")
+  stockAwalEmergencyCr1tr    Int       @default(0) @map("stock_awal_emergency_cr_1tr")
+  stockAwalEmergencyCam01    Int       @default(0) @map("stock_awal_emergency_cam_01")
+  stockAwalEmergencyCam02    Int       @default(0) @map("stock_awal_emergency_cam_02")
+  planProdCb1tr              Int       @default(0) @map("plan_prod_cb_1tr")
+  planProdCb2tr              Int       @default(0) @map("plan_prod_cb_2tr")
+  planProdCr1tr              Int       @default(0) @map("plan_prod_cr_1tr")
+  planProdCam01              Int       @default(0) @map("plan_prod_cam_01")
+  planProdCam02              Int       @default(0) @map("plan_prod_cam_02")
+  inputBy                    String?   @map("input_by")
+  inputAt           DateTime? @map("input_at")
+  remarks           String?
+
+  @@unique([tanggal, shift, dayNight])
+  @@map("Daily_Planning")
+}
+
+model OrderHeader {
+  orderId         String        @id @map("order_id")
+  kodeOrder       String        @map("kode_order")
+  tanggalOrder    DateTime      @map("tanggal_order") @db.Date
+  waktuOrder      DateTime      @map("waktu_order")
+  shift           String
+  dayNight        String?       @map("day_night")
+  truckType       String?       @map("truck_type")
+  requestType     String        @default("ORDER") @map("request_type")
+  ritaseRequest   Int?          @default(0) @map("ritase_request")
+  ratioCb1tr      Int           @default(0) @map("ratio_cb_1tr")
+  ratioCb2tr      Int           @default(0) @map("ratio_cb_2tr")
+  statusOrder     String?       @map("status_order")
+  deliveryNote    String?       @map("delivery_note")
+  shellStateCb1tr String?       @map("shell_state_cb_1tr")
+  shellStateCb2tr String?       @map("shell_state_cb_2tr")
+  remarksOrdering String?       @map("remarks_ordering")
+  remarksDelivery String?       @map("remarks_delivery")
+  createdBy       String?       @map("created_by")
+  createdAt       DateTime?     @map("created_at")
+  updatedBy       String?       @map("updated_by")
+  updatedAt       DateTime?     @map("updated_at")
+  details         OrderDetail[]
+
+  @@index([tanggalOrder, shift, dayNight])
+  @@index([kodeOrder])
+  @@map("Order_Header")
+}
+
+model OrderDetail {
+  detailId         String      @id @map("detail_id")
+  orderId          String      @map("order_id")
+  itemCode         String      @map("item_code")
+  itemName         String      @map("item_name")
+  qtyOrder         Int         @default(0) @map("qty_order")
+  gapRequestQty    Int         @default(0) @map("gap_request_qty")
+  qtyConfirm       Int?        @default(0) @map("qty_confirm")
+  qtyReceived      Int?        @default(0) @map("qty_received")
+  remarksOrdering  String?     @map("remarks_ordering")
+  remarksDelivery  String?     @map("remarks_delivery")
+  lineNo           Int?        @default(0) @map("line_no")
+  createdAt        DateTime?   @map("created_at")
+  updatedAt        DateTime?   @map("updated_at")
+  order            OrderHeader @relation(fields: [orderId], references: [orderId], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([itemCode])
+  @@map("Order_Detail")
+}
+
+model Notification {
+  id         String                  @id @default(cuid())
+  type       NotificationType
+  title      String
+  message    String
+  orderId    String?                 @map("order_id")
+  kodeOrder  String                  @map("kode_order")
+  targetRole Role                    @map("target_role")
+  createdAt  DateTime                @default(now()) @map("created_at")
+  recipients NotificationRecipient[]
+
+  @@index([targetRole, createdAt])
+  @@index([orderId])
+}
+
+model NotificationRecipient {
+  id             String       @id @default(cuid())
+  notificationId String       @map("notification_id")
+  userId         String       @map("user_id")
+  isRead         Boolean      @default(false) @map("is_read")
+  readAt         DateTime?    @map("read_at")
+  dismissedAt    DateTime?    @map("dismissed_at")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  notification   Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([notificationId])
+  @@unique([notificationId, userId])
+}
