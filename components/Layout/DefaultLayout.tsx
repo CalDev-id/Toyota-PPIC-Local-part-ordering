@@ -82,6 +82,10 @@ export default function DefaultLayout({ children }: DefaultLayoutProps) {
   const profileRole = mounted ? session?.user?.role || "-" : "-";
   const profileEmail = mounted ? session?.user?.email || "No email" : "No email";
 
+  if (!mounted) {
+    return <div className="min-h-screen bg-[radial-gradient(circle_at_top,_#dbeafe_0%,_#eff6ff_35%,_#f8fafc_100%)]" />;
+  }
+
   async function handleLogout() {
     setLoggingOut(true);
     setProfileOpen(false);

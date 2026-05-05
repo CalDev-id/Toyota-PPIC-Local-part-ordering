@@ -2,6 +2,7 @@
 
 import type { AppRole } from "@/lib/roles";
 import { useSession } from "next-auth/react";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSyncExternalStore } from "react";
@@ -175,12 +176,19 @@ export default function Sidebar({
             }`}
           >
             <div
-              className={`overflow-hidden transition-all duration-300 ml-2 ${
+              className={`overflow-hidden transition-all duration-300 ml-0 ${
                 collapsed ? "w-0 opacity-0 md:hidden" : "w-auto opacity-100"
               }`}
             >
-              <p className="text-3xl font-semibold">TOYOTA</p>
-              <span className="text-slate-500">PAD - CCR Division</span>
+              <Image
+                src="/image/tmmin_logo.png"
+                alt="TMMIN"
+                width={150}
+                height={42}
+                priority
+                className="-ml-5 h-20 w-auto object-contain"
+              />
+              {/* <span className="text-slate-500">PAD - CCR Division</span> */}
             </div>
 
             {/* CLOSE BUTTON */}
