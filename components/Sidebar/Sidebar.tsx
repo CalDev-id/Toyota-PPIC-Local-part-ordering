@@ -81,6 +81,18 @@ const menuItems: MenuItem[] = [
     ),
   },
   {
+    label: "Stock",
+    href: "/ordering/stock",
+    roles: ["ADMIN", "ORDERING"],
+    icon: (
+      <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8">
+        <path d="M4 7.5 12 3l8 4.5-8 4.5L4 7.5Z" />
+        <path d="M4 7.5v9L12 21l8-4.5v-9" />
+        <path d="M12 12v9" />
+      </svg>
+    ),
+  },
+  {
     label: "Delivery",
     href: "/delivery",
     roles: ["ADMIN", "DELIVERY"],

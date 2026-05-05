@@ -118,7 +118,7 @@ export async function resolveAnalysisContext(
   const defaultDayNight = getDefaultDayNightByTime();
 
   const date =
-    input?.date && options.dates.includes(input.date)
+    isValidDateInput(input?.date)
       ? input.date
       : options.dates.includes(today)
         ? today
@@ -366,6 +366,10 @@ function normalizeShift(value: string | null | undefined): string {
 
 function normalizeDayNight(value: string | null | undefined): string {
   return value?.trim().toUpperCase() || "";
+}
+
+function isValidDateInput(value: string | undefined): value is string {
+  return Boolean(value && /^\d{4}-\d{2}-\d{2}$/.test(value));
 }
 
 function formatDateInput(value: Date): string {

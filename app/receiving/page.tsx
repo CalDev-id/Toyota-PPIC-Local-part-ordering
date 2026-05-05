@@ -50,7 +50,7 @@ export default async function ReceivingPage({ searchParams }: ReceivingPageProps
 
   return (
     <DefaultLayout>
-      <div key={`${activeFilter.date}-${activeFilter.shift}-${activeFilter.dayNight}`}>
+      <div>
         <ReceivingReportShell
           activeOrders={activeOrders}
           finishedOrders={finishedOrders}

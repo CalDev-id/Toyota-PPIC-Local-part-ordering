@@ -51,7 +51,7 @@ export default async function DeliveryPage({ searchParams }: DeliveryPageProps) 
 
   return (
     <DefaultLayout>
-      <div key={`${activeFilter.date}-${activeFilter.shift}-${activeFilter.dayNight}`}>
+      <div>
         <DeliveryReportShell
           activeOrders={activeOrders}
           finishedOrders={finishedOrders}

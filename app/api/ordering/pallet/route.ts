@@ -24,10 +24,12 @@ export async function GET(req: Request) {
     }
 
     const { searchParams } = new URL(req.url);
+    const date = searchParams.get("date")?.trim() || "";
     const shift = searchParams.get("shift")?.trim().toUpperCase() || "";
     const dayNight = searchParams.get("dayNight")?.trim().toUpperCase() || "";
+    const planningDate = date ? new Date(`${date}T00:00:00.000Z`) : new Date();
 
-    const plans = shift && dayNight ? await getPalletPlanningMetrics(shift, dayNight) : {
+    const plans = shift && dayNight ? await getPalletPlanningMetrics(shift, dayNight, planningDate) : {
       CB_1TR: 0,
       CB_2TR: 0,
       CR_1TR: 0,

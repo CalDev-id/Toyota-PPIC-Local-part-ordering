@@ -3,12 +3,13 @@
 import RitaseProgressCard from "@/components/ordering/RitaseProgressCard";
 import { getRitaseSchedule, RITASE_OPTIONS, type RitaseScheduleItem } from "@/lib/ritase-schedule";
 import type { FormEvent } from "react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 type ItemCode = "CR_1TR" | "CAM_01" | "CAM_02" | "CB_1TR" | "CB_2TR";
 
 type PalletFormState = {
+  tanggalOrder: string;
   shift: string;
   dayNight: string;
   ritaseRequest: number;
@@ -45,6 +46,7 @@ const dayNightOptions = ["DAY", "NIGHT"];
 const ritaseOptions = RITASE_OPTIONS.map(String);
 
 const emptyForm: PalletFormState = {
+  tanggalOrder: formatDateInput(new Date()),
   shift: "",
   dayNight: "",
   ritaseRequest: 1,
@@ -105,17 +107,13 @@ export default function PalletOrderForm({
   }, [initialValues]);
 
   useEffect(() => {
-    if (!form.shift || !form.dayNight) {
+    if (!form.tanggalOrder || !form.shift || !form.dayNight) {
       setPlans(emptyPlans);
       return;
     }
 
-    void loadPlans(form.shift, form.dayNight);
-  }, [form.shift, form.dayNight]);
-
-  const todayDate = useMemo(() => formatDateInput(new Date()), []);
-  const todayLabel = useMemo(() => formatDateLabel(new Date()), []);
-  const progressDate = ritaseProgressDate || todayDate;
+    void loadPlans(form.tanggalOrder, form.shift, form.dayNight);
+  }, [form.tanggalOrder, form.shift, form.dayNight]);
 
   function showToast(type: "success" | "error", message: string) {
     if (toastTimeoutRef.current) {
@@ -129,10 +127,10 @@ export default function PalletOrderForm({
     }, 3200);
   }
 
-  async function loadPlans(shift: string, dayNight: string) {
+  async function loadPlans(date: string, shift: string, dayNight: string) {
     try {
       setLoadingPlans(true);
-      const params = new URLSearchParams({ shift, dayNight });
+      const params = new URLSearchParams({ date, shift, dayNight });
       const res = await fetch(`/api/ordering/pallet?${params.toString()}`, { cache: "no-store" });
       const data = await res.json();
 
@@ -206,10 +204,10 @@ export default function PalletOrderForm({
     }
 
     const controller = new AbortController();
-    void loadRitaseProgress(progressDate, form.dayNight, controller.signal);
+    void loadRitaseProgress(form.tanggalOrder || ritaseProgressDate || formatDateInput(new Date()), form.dayNight, controller.signal);
 
     return () => controller.abort();
-  }, [progressDate, form.dayNight, loadRitaseProgress]);
+  }, [form.tanggalOrder, form.dayNight, loadRitaseProgress, ritaseProgressDate]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -219,6 +217,7 @@ export default function PalletOrderForm({
       setError("");
 
       const payload = {
+        tanggalOrder: form.tanggalOrder,
         shift: form.shift,
         dayNight: form.dayNight,
         ritaseRequest: form.ritaseRequest,
@@ -242,7 +241,7 @@ export default function PalletOrderForm({
         throw new Error(data.error ?? "Gagal membuat order pallet");
       }
 
-      setForm(emptyForm);
+      setForm(initialValues ?? emptyForm);
       setPlans(emptyPlans);
       onSuccess?.(data.kodeOrder ?? initialKodeOrder ?? "");
 
@@ -290,7 +289,11 @@ export default function PalletOrderForm({
         <div className="rounded-2xl border border-slate-200 bg-white/95 p-5 shadow-sm">
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-[minmax(220px,1.4fr)_minmax(150px,1fr)_minmax(150px,1fr)_minmax(150px,1fr)_max-content] xl:items-end">
             <div>
-              <ReadOnlyField label="Tanggal Order" value={todayLabel} />
+              <DateField
+                label="Tanggal Order"
+                value={form.tanggalOrder}
+                onChange={(value) => setForm((current) => ({ ...current, tanggalOrder: value }))}
+              />
             </div>
             <div>
               <SelectField
@@ -405,7 +408,7 @@ export default function PalletOrderForm({
           <button
             type="button"
             onClick={() => {
-              setForm(emptyForm);
+              setForm(initialValues ?? emptyForm);
               setPlans(emptyPlans);
               setError("");
             }}
@@ -505,13 +508,24 @@ function Badge({ label, color }: { label: string; color?: "yellow" | "green" }) 
   return <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${className}`}>{label}</span>;
 }
 
-function ReadOnlyField({ label, value }: { label: string; value: string }) {
+function DateField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
   return (
     <div>
       <label className="mb-1 block text-sm font-medium text-slate-700">{label}</label>
-      <div className="flex h-11 items-center rounded-xl border border-slate-200 bg-slate-100 px-3 text-sm text-slate-700">
-        {value}
-      </div>
+      <input
+        type="date"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm outline-none transition focus:border-sky-500"
+      />
     </div>
   );
 }
@@ -584,13 +598,6 @@ function NumberField({
       />
     </div>
   );
-}
-
-function formatDateLabel(value: Date) {
-  return new Intl.DateTimeFormat("id-ID", {
-    dateStyle: "full",
-    timeZone: "UTC",
-  }).format(value);
 }
 
 function formatDateInput(value: Date) {

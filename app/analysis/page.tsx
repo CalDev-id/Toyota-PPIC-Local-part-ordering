@@ -50,7 +50,7 @@ export default async function AnalysisPage({ searchParams }: AnalysisPageProps) 
 
   return (
     <DefaultLayout>
-      <div key={`${activeFilter.date}-${activeFilter.shift}-${activeFilter.dayNight}`}>
+      <div>
         <AnalysisDashboard
           data={dashboardData}
           selectedFilter={activeFilter}
