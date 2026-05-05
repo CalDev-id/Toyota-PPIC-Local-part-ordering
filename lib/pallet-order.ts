@@ -8,6 +8,7 @@ export type PalletOrderItemInput = {
 };
 
 export type PalletOrderInput = {
+  tanggalOrder: string;
   shift: string;
   dayNight: string;
   ritaseRequest: number;
@@ -48,6 +49,7 @@ export function normalizePalletOrderPayload(body: unknown): PalletOrderInput {
   const rawItems = Array.isArray(payload.items) ? payload.items : [];
 
   return {
+    tanggalOrder: normalizeText(payload.tanggalOrder),
     shift: normalizeText(payload.shift).toUpperCase(),
     dayNight: normalizeText(payload.dayNight).toUpperCase(),
     ritaseRequest: normalizeInteger(payload.ritaseRequest),
@@ -59,6 +61,10 @@ export function normalizePalletOrderPayload(body: unknown): PalletOrderInput {
 }
 
 export function validatePalletOrderInput(input: PalletOrderInput) {
+  if (!input.tanggalOrder) {
+    return "Tanggal order wajib dipilih";
+  }
+
   if (!input.shift) {
     return "Shift wajib dipilih";
   }
@@ -149,7 +155,7 @@ export function buildPalletOrderData(input: PalletOrderInput, userLabel: string,
     header: {
       orderId,
       kodeOrder,
-      tanggalOrder: new Date(`${formatDateInput(now)}T00:00:00.000Z`),
+      tanggalOrder: new Date(`${input.tanggalOrder}T00:00:00.000Z`),
       waktuOrder: now,
       shift: input.shift,
       dayNight: input.dayNight,

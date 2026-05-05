@@ -191,7 +191,7 @@ export default function OrderingReport({
   }
 
   return (
-    <section key={`${selectedFilter.date}-${selectedFilter.shift}-${selectedFilter.dayNight}`} className="space-y-5">
+    <section className="space-y-5">
       <div className="rounded-2xl border border-slate-200 bg-white/90 p-6 shadow-sm">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
           <div>
@@ -371,6 +371,7 @@ export default function OrderingReport({
             initialValues={
               editableOrder?.truckType === "PALLET"
                 ? {
+                    tanggalOrder: editableOrder.tanggalOrder,
                     shift: editableOrder.shift,
                     dayNight: editableOrder.dayNight,
                     ritaseRequest: editableOrder.ritaseRequest,
@@ -384,6 +385,7 @@ export default function OrderingReport({
                     },
                   }
                 : {
+                    tanggalOrder: selectedFilter.date,
                     shift: selectedFilter.shift,
                     dayNight: selectedFilter.dayNight,
                     ritaseRequest: 1,

@@ -1,7 +1,15 @@
 "use client";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { startTransition, useEffect, useState, type ReactNode, type SelectHTMLAttributes } from "react";
+import {
+  startTransition,
+  useEffect,
+  useRef,
+  useState,
+  type InputHTMLAttributes,
+  type ReactNode,
+  type SelectHTMLAttributes,
+} from "react";
 
 type ReportFilterValue = {
   date: string;
@@ -30,15 +38,21 @@ export default function AutoSubmitReportFilters({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [filters, setFilters] = useState(selectedFilter);
+  const dateSyncTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     setFilters(selectedFilter);
   }, [selectedFilter]);
 
-  function updateFilter(key: keyof ReportFilterValue, value: string) {
-    const nextFilters = { ...filters, [key]: value };
-    setFilters(nextFilters);
+  useEffect(() => {
+    return () => {
+      if (dateSyncTimeoutRef.current) {
+        clearTimeout(dateSyncTimeoutRef.current);
+      }
+    };
+  }, []);
 
+  function pushFilters(nextFilters: ReportFilterValue) {
     const params = new URLSearchParams(searchParams.toString());
     params.set("date", nextFilters.date);
     params.set("shift", nextFilters.shift);
@@ -49,20 +63,42 @@ export default function AutoSubmitReportFilters({
     });
   }
 
+  function updateFilter(key: keyof ReportFilterValue, value: string) {
+    if (dateSyncTimeoutRef.current) {
+      clearTimeout(dateSyncTimeoutRef.current);
+      dateSyncTimeoutRef.current = null;
+    }
+
+    const nextFilters = { ...filters, [key]: value };
+    setFilters(nextFilters);
+    pushFilters(nextFilters);
+  }
+
+  function updateDateFilter(value: string) {
+    setFilters((current) => {
+      const nextFilters = { ...current, date: value };
+
+      if (dateSyncTimeoutRef.current) {
+        clearTimeout(dateSyncTimeoutRef.current);
+      }
+
+      dateSyncTimeoutRef.current = setTimeout(() => {
+        pushFilters(nextFilters);
+        dateSyncTimeoutRef.current = null;
+      }, 250);
+
+      return nextFilters;
+    });
+  }
+
   return (
     <div className={className}>
       <FilterField label="Tanggal">
-        <SelectField
+        <DateField
           name="date"
           value={filters.date}
-          onChange={(event) => updateFilter("date", event.target.value)}
-        >
-          {filterOptions.dates.map((date) => (
-            <option key={date} value={date}>
-              {formatDateOption(date)}
-            </option>
-          ))}
-        </SelectField>
+          onChange={(event) => updateDateFilter(event.target.value)}
+        />
       </FilterField>
 
       <FilterField label="Shift">
@@ -127,24 +163,12 @@ function SelectField(props: SelectHTMLAttributes<HTMLSelectElement>) {
   );
 }
 
-function formatDateOption(value: string) {
-  const [year, month, day] = value.split("-").map(Number);
-  const date = new Date(Date.UTC(year, month - 1, day));
-
-  return `${String(date.getUTCDate()).padStart(2, "0")} ${MONTH_NAMES_FULL[date.getUTCMonth()]} ${date.getUTCFullYear()}`;
+function DateField(props: InputHTMLAttributes<HTMLInputElement>) {
+  return (
+    <input
+      {...props}
+      type="date"
+      className="h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-sky-500"
+    />
+  );
 }
-
-const MONTH_NAMES_FULL = [
-  "Jan",
-  "Feb",
-  "Mar",
-  "Apr",
-  "Mei",
-  "Jun",
-  "Jul",
-  "Agu",
-  "Sep",
-  "Okt",
-  "Nov",
-  "Des",
-];

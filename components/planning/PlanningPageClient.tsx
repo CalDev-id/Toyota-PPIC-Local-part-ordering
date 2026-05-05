@@ -42,7 +42,7 @@ export default function PlanningPageClient() {
   const [selectedDate, setSelectedDate] = useState(getTodayInputValue());
   const [selectedShift, setSelectedShift] = useState("WHITE");
   const [selectedDayNight, setSelectedDayNight] = useState<string>(getDefaultDayNightByTime());
-  const [form, setForm] = useState<PlanningFormValues>(() => buildEmptyForm());
+  const [form, setForm] = useState<PlanningFormValues>(() => buildEmptyForm(getTodayInputValue()));
   const [editingId, setEditingId] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingMeta, setEditingMeta] = useState<Pick<PlanningRecord, "planId" | "inputBy" | "inputAt"> | null>(
@@ -184,14 +184,14 @@ export default function PlanningPageClient() {
     setModalOpen(true);
   }
 
-  function resetForm() {
+  function resetForm(nextDate = getTodayInputValue()) {
     setEditingId(null);
     setEditingMeta(null);
-    setForm(buildEmptyForm());
+    setForm(buildEmptyForm(nextDate));
   }
 
   function openCreateModal() {
-    resetForm();
+    resetForm(selectedDate);
     setError("");
     setModalOpen(true);
   }
@@ -203,7 +203,7 @@ export default function PlanningPageClient() {
 
     setModalOpen(false);
     setError("");
-    resetForm();
+    resetForm(selectedDate);
   }
 
   function updateField<Key extends keyof PlanningFormValues>(key: Key, value: PlanningFormValues[Key]) {
@@ -515,9 +515,14 @@ export default function PlanningPageClient() {
                     />
                   </div>
 
-                  <div className="flex flex-col justify-center xl:items-end">
-                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Tanggal</p>
-                    <p className="mt-1 text-lg font-bold text-slate-900">{formatDateLabel(form.tanggal)}</p>
+                  <div className="xl:ml-auto xl:w-[220px]">
+                    <label className="mb-1 block text-sm font-medium text-slate-700">Tanggal</label>
+                    <input
+                      type="date"
+                      value={form.tanggal}
+                      onChange={(event) => updateField("tanggal", event.target.value)}
+                      className="h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm outline-none transition focus:border-sky-500"
+                    />
                   </div>
                 </div>
 
@@ -715,9 +720,9 @@ function getTodayInputValue() {
   return new Date().toISOString().slice(0, 10);
 }
 
-function buildEmptyForm(): PlanningFormValues {
+function buildEmptyForm(tanggal = getTodayInputValue()): PlanningFormValues {
   return {
-    tanggal: getTodayInputValue(),
+    tanggal,
     shift: "",
     dayNight: getDefaultDayNightByTime(),
     stockAwalJunbikiCb1tr: 0,
@@ -734,23 +739,6 @@ function buildEmptyForm(): PlanningFormValues {
     planProdCam02: 0,
     remarks: "",
   };
-}
-
-function formatDateLabel(value: string) {
-  if (!value) {
-    return "-";
-  }
-
-  const [year, month, day] = value.split("-").map(Number);
-  const date = new Date(Date.UTC(year, month - 1, day));
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-
-  return new Intl.DateTimeFormat("id-ID", {
-    dateStyle: "full",
-    timeZone: "UTC",
-  }).format(date);
 }
 
 function MetricRow({

@@ -49,7 +49,7 @@ export default async function OrderingPage({ searchParams }: OrderingPageProps) 
 
   return (
     <DefaultLayout>
-      <div key={`${activeFilter.date}-${activeFilter.shift}-${activeFilter.dayNight}`}>
+      <div>
         <OrderingReportShell
           rows={rows}
           summaries={summaries}
