@@ -116,8 +116,8 @@ export default function DefaultLayout({ children }: DefaultLayoutProps) {
                 </svg>
               </button>
               <div>
-                <p className="text-sm font-semibold text-slate-900">Toyota Dashboard</p>
-                <p className="text-xs text-slate-500">Layout with collapsible sidebar</p>
+                <p className="text-sm font-semibold text-slate-900">CCR Ordering</p>
+                <p className="text-xs text-slate-500">Dashboard</p>
               </div>
             </div>
             <div className="flex items-center gap-3">

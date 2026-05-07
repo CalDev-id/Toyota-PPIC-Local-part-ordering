@@ -24,55 +24,98 @@ type RecapTableColumn = {
   key: string;
   label: string;
   align?: "left" | "right";
+  group?: "identity" | RecapMetricKey | "total";
   getValue: (row: RecapRow) => string | number;
 };
 
+type RecapMetricKey = "cb1tr" | "cb2tr" | "cr1tr" | "cam01" | "cam02";
+
+type ColumnGroup = {
+  key: string;
+  label: string;
+  colSpan: number;
+  className: string;
+};
+
+const metricLabels = ["Stock", "Plan", "Request", "Delivery", "Received", "Gap"];
+const metricGroupClassNames: Record<RecapMetricKey, string> = {
+  cb1tr: "bg-white",
+  cb2tr: "bg-slate-50/80",
+  cr1tr: "bg-white",
+  cam01: "bg-slate-50/80",
+  cam02: "bg-white",
+};
+const metricHeaderClassNames: Record<RecapMetricKey, string> = {
+  cb1tr: "bg-emerald-50 text-emerald-900",
+  cb2tr: "bg-sky-50 text-sky-900",
+  cr1tr: "bg-amber-50 text-amber-900",
+  cam01: "bg-violet-50 text-violet-900",
+  cam02: "bg-rose-50 text-rose-900",
+};
+
+const columnGroups: ColumnGroup[] = [
+  { key: "identity", label: "Info", colSpan: 3, className: "bg-slate-100 text-slate-700" },
+  ...RECAP_METRIC_CONFIGS.map((config) => ({
+    key: config.key,
+    label: config.label,
+    colSpan: metricLabels.length,
+    className: metricHeaderClassNames[config.key],
+  })),
+  { key: "total", label: "Total", colSpan: 4, className: "bg-slate-900 text-white" },
+];
+
 const tableColumns: RecapTableColumn[] = [
-  { key: "tanggal", label: "Tanggal", getValue: (row) => row.tanggalLabel },
-  { key: "shift", label: "Shift", getValue: (row) => row.shift },
-  { key: "dayNight", label: "Day/Night", getValue: (row) => row.dayNight },
+  { key: "tanggal", label: "Tanggal", group: "identity", getValue: (row) => row.tanggalLabel },
+  { key: "shift", label: "Shift", group: "identity", getValue: (row) => row.shift },
+  { key: "dayNight", label: "Day/Night", group: "identity", getValue: (row) => row.dayNight },
   ...RECAP_METRIC_CONFIGS.flatMap((config) => [
     {
       key: `${config.key}StockAwal`,
-      label: `${config.label} Stock`,
+      label: "Stock",
+      group: config.key,
       align: "right" as const,
       getValue: (row: RecapRow) => row[config.key].stockAwal,
     },
     {
       key: `${config.key}Plan`,
-      label: `${config.label} Plan`,
+      label: "Plan",
+      group: config.key,
       align: "right" as const,
       getValue: (row: RecapRow) => row[config.key].planProd,
     },
     {
       key: `${config.key}Request`,
-      label: `${config.label} Request`,
+      label: "Request",
+      group: config.key,
       align: "right" as const,
       getValue: (row: RecapRow) => row[config.key].request,
     },
     {
       key: `${config.key}Delivery`,
-      label: `${config.label} Delivery`,
+      label: "Delivery",
+      group: config.key,
       align: "right" as const,
       getValue: (row: RecapRow) => row[config.key].delivery,
     },
     {
       key: `${config.key}Received`,
-      label: `${config.label} Received`,
+      label: "Received",
+      group: config.key,
       align: "right" as const,
       getValue: (row: RecapRow) => row[config.key].received,
     },
     {
       key: `${config.key}Gap`,
-      label: `${config.label} Gap`,
+      label: "Gap",
+      group: config.key,
       align: "right" as const,
       getValue: (row: RecapRow) => row[config.key].gap,
     },
   ]),
-  { key: "totalPlan", label: "Total Plan", align: "right", getValue: (row) => row.totalPlan },
-  { key: "totalRequest", label: "Total Request", align: "right", getValue: (row) => row.totalRequest },
-  { key: "totalDelivery", label: "Total Delivery", align: "right", getValue: (row) => row.totalDelivery },
-  { key: "totalReceived", label: "Total Received", align: "right", getValue: (row) => row.totalReceived },
+  { key: "totalPlan", label: "Plan", group: "total", align: "right", getValue: (row) => row.totalPlan },
+  { key: "totalRequest", label: "Request", group: "total", align: "right", getValue: (row) => row.totalRequest },
+  { key: "totalDelivery", label: "Delivery", group: "total", align: "right", getValue: (row) => row.totalDelivery },
+  { key: "totalReceived", label: "Received", group: "total", align: "right", getValue: (row) => row.totalReceived },
 ];
 
 export default function RecapPageClient({
@@ -113,7 +156,7 @@ export default function RecapPageClient({
     }
 
     const worksheetRows = rows.map((row) =>
-      Object.fromEntries(tableColumns.map((column) => [column.label, column.getValue(row)]))
+      Object.fromEntries(tableColumns.map((column) => [getExportColumnLabel(column), column.getValue(row)]))
     );
     const worksheet = XLSX.utils.json_to_sheet(worksheetRows);
     const workbook = XLSX.utils.book_new();
@@ -186,7 +229,7 @@ export default function RecapPageClient({
       ) : null}
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-        <SummaryCard label="Baris Recap" value={summary.totalRows} />
+        <SummaryCard label="Total Order" value={summary.totalRows} />
         <SummaryCard label="Total Plan" value={summary.totalPlan} />
         <SummaryCard label="Total Request" value={summary.totalRequest} />
         <SummaryCard label="Total Delivery" value={summary.totalDelivery} />
@@ -207,16 +250,26 @@ export default function RecapPageClient({
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="min-w-full border-collapse text-sm">
-              <thead className="bg-slate-100/90 text-slate-700">
+            <table className="min-w-full border-separate border-spacing-0 text-sm">
+              <thead className="text-slate-700">
+                <tr>
+                  {columnGroups.map((group) => (
+                    <th
+                      key={group.key}
+                      scope="colgroup"
+                      colSpan={group.colSpan}
+                      className={`border-b border-r border-slate-200 px-4 py-3 text-center text-xs font-bold uppercase tracking-[0.12em] whitespace-nowrap ${group.className}`}
+                    >
+                      {group.label}
+                    </th>
+                  ))}
+                </tr>
                 <tr>
                   {tableColumns.map((column) => (
                     <th
                       key={column.key}
                       scope="col"
-                      className={`border-b border-slate-200 px-4 py-3 text-xs font-semibold uppercase tracking-[0.08em] whitespace-nowrap ${
-                        column.align === "right" ? "text-right" : "text-left"
-                      }`}
+                      className={getHeaderCellClassName(column)}
                     >
                       {column.label}
                     </th>
@@ -226,16 +279,17 @@ export default function RecapPageClient({
               <tbody>
                 {rows.map((row) => (
                   <tr key={row.key} className="align-top odd:bg-white even:bg-slate-50/60">
-                    {tableColumns.map((column) => (
+                    {tableColumns.map((column) => {
+                      const value = column.getValue(row);
+                      return (
                       <td
                         key={column.key}
-                        className={`border-b border-slate-200 px-4 py-3 whitespace-nowrap text-slate-700 ${
-                          column.align === "right" ? "text-right tabular-nums" : "text-left"
-                        }`}
+                        className={getBodyCellClassName(column, value)}
                       >
-                        {formatCellValue(column.getValue(row))}
+                        {formatCellValue(value)}
                       </td>
-                    ))}
+                      );
+                    })}
                   </tr>
                 ))}
               </tbody>
@@ -295,6 +349,51 @@ function buildExcelFileName(filter: RecapFilter) {
   const shift = filter.shift === RECAP_FILTER_ALL ? "all-shift" : filter.shift.toLowerCase();
   const dayNight = filter.dayNight === RECAP_FILTER_ALL ? "all-daynight" : filter.dayNight.toLowerCase();
   return `recap-${filter.month}-${shift}-${dayNight}.xlsx`;
+}
+
+function getExportColumnLabel(column: RecapTableColumn) {
+  if (!column.group || column.group === "identity") {
+    return column.label;
+  }
+
+  if (column.group === "total") {
+    return `Total ${column.label}`;
+  }
+
+  const metricConfig = RECAP_METRIC_CONFIGS.find((config) => config.key === column.group);
+  return `${metricConfig?.label ?? column.group} ${column.label}`;
+}
+
+function getHeaderCellClassName(column: RecapTableColumn) {
+  const alignClassName = column.align === "right" ? "text-right" : "text-left";
+  const groupClassName =
+    column.group === "total"
+      ? "border-l-2 border-l-slate-300 bg-slate-100"
+      : column.group && column.group !== "identity"
+        ? metricGroupClassNames[column.group]
+        : "bg-white";
+
+  return `border-b border-r border-slate-200 px-4 py-3 text-xs font-semibold uppercase tracking-[0.08em] whitespace-nowrap ${alignClassName} ${groupClassName}`;
+}
+
+function getBodyCellClassName(column: RecapTableColumn, value: string | number) {
+  const alignClassName = column.align === "right" ? "text-right tabular-nums" : "text-left";
+  const groupClassName =
+    column.group === "total"
+      ? "border-l-2 border-l-slate-300 bg-slate-100/80 font-semibold text-slate-900"
+      : column.group && column.group !== "identity"
+        ? metricGroupClassNames[column.group]
+        : "bg-white font-medium text-slate-900";
+  const valueClassName =
+    column.key.toLowerCase().includes("gap") && typeof value === "number"
+      ? value < 0
+        ? "font-semibold text-rose-600"
+        : value > 0
+          ? "font-semibold text-emerald-600"
+          : "text-slate-500"
+      : "text-slate-700";
+
+  return `border-b border-r border-slate-200 px-4 py-3 whitespace-nowrap ${alignClassName} ${groupClassName} ${valueClassName}`;
 }
 
 function formatCellValue(value: string | number) {
