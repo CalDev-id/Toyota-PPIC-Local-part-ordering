@@ -1,4 +1,5 @@
 import DefaultLayout from "@/components/Layout/DefaultLayout";
+import type { AppRole } from "@/lib/roles";
 import { requireSession } from "@/lib/session";
 import Link from "next/link";
 
@@ -7,6 +8,7 @@ type ShortcutItem = {
   description: string;
   href: string;
   accent: string;
+  roles?: AppRole[];
 };
 
 const shortcutItems: ShortcutItem[] = [
@@ -27,24 +29,35 @@ const shortcutItems: ShortcutItem[] = [
     description: "Kelola planning harian, stock awal, dan plan produksi untuk ordering.",
     href: "/planning",
     accent: "from-emerald-500 to-teal-500",
+    roles: ["ADMIN", "ORDERING"],
   },
   {
     title: "Ordering",
     description: "Buat order baru, lihat active order, dan monitor total stock vs delivery.",
     href: "/ordering",
     accent: "from-slate-900 to-slate-600",
+    roles: ["ADMIN", "ORDERING"],
+  },
+  {
+    title: "Recap",
+    description: "Lihat recap bulanan planning dan ordering, lalu download ke Excel.",
+    href: "/recap",
+    accent: "from-emerald-600 to-sky-500",
+    roles: ["ADMIN", "ORDERING"],
   },
   {
     title: "Delivery",
     description: "Konfirmasi order masuk, isi qty confirm, dan pantau finish order.",
     href: "/delivery",
     accent: "from-amber-500 to-orange-500",
+    roles: ["ADMIN", "DELIVERY"],
   },
   {
     title: "Receiving",
     description: "Input qty received untuk order confirmed dan selesaikan flow menjadi checked.",
     href: "/receiving",
     accent: "from-cyan-500 to-blue-500",
+    roles: ["ADMIN", "RECEIVING"],
   },
   // {
   //   title: "Users",
@@ -55,7 +68,10 @@ const shortcutItems: ShortcutItem[] = [
 ];
 
 export default async function Home() {
-  await requireSession();
+  const session = await requireSession();
+  const visibleShortcutItems = shortcutItems.filter(
+    (item) => !item.roles || item.roles.includes(session.user.role)
+  );
 
   return (
     <DefaultLayout>
@@ -79,12 +95,12 @@ export default async function Home() {
               <h2 className="mt-2 text-xl font-bold text-slate-900">Modul Utama</h2>
             </div>
             <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-              {shortcutItems.length} menu
+              {visibleShortcutItems.length} menu
             </span>
           </div>
 
           <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {shortcutItems.map((item) => (
+            {visibleShortcutItems.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
