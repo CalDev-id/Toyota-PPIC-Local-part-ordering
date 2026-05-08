@@ -269,50 +269,59 @@ function QueueTable({
         </div>
       ) : (
         <div className="overflow-x-auto">
-          <table className="min-w-full border-collapse text-sm">
-            <thead className="bg-slate-100/90 text-slate-700">
+          <table className="min-w-full border-separate border-spacing-0 text-sm">
+            <thead className="text-slate-700">
+              <tr>
+                {buildReceivingColumnGroups(showReceived, Boolean(onCheck)).map((group) => (
+                  <th
+                    key={group.key}
+                    colSpan={group.colSpan}
+                    className={`border-b border-r border-slate-200 px-4 py-3 text-center text-xs font-bold uppercase tracking-[0.12em] whitespace-nowrap ${group.className}`}
+                  >
+                    {group.label}
+                  </th>
+                ))}
+              </tr>
               <tr>
                 {baseColumns.map((column) => (
                   <th
                     key={column.key}
-                    className={`border-b border-slate-200 px-4 py-3 font-semibold whitespace-nowrap ${
+                    className={`border-b border-r border-slate-200 bg-white px-4 py-3 font-semibold whitespace-nowrap ${
                       column.align === "right" ? "text-right" : "text-left"
                     }`}
                   >
                     {column.label}
                   </th>
                 ))}
-                {metricColumns.map((column) => (
+                {metricColumns.flatMap((column) => [
                   <th
                     key={`${column.key}-request`}
-                    className="border-b border-slate-200 px-4 py-3 text-right font-semibold whitespace-nowrap"
+                    className={`border-b border-r border-slate-200 px-4 py-3 text-right font-semibold whitespace-nowrap ${getReceivingGroupCellClassName(column.key)}`}
                   >
-                    {column.requestLabel}
-                  </th>
-                ))}
-                {metricColumns.map((column) => (
+                    Request
+                  </th>,
                   <th
                     key={`${column.key}-delivery`}
-                    className="border-b border-slate-200 px-4 py-3 text-right font-semibold whitespace-nowrap"
+                    className={`border-b border-r border-slate-200 px-4 py-3 text-right font-semibold whitespace-nowrap ${getReceivingGroupCellClassName(column.key)}`}
                   >
-                    {column.deliveryLabel}
-                  </th>
-                ))}
-                {showReceived
-                  ? metricColumns.map((column) => (
+                    Delivery
+                  </th>,
+                  ...(showReceived
+                    ? [
                       <th
                         key={`${column.key}-received`}
-                        className="border-b border-slate-200 px-4 py-3 text-right font-semibold whitespace-nowrap"
+                        className={`border-b border-r border-slate-200 px-4 py-3 text-right font-semibold whitespace-nowrap ${getReceivingGroupCellClassName(column.key)}`}
                       >
-                        {column.receivedLabel}
-                      </th>
-                    ))
-                  : null}
-                <th className="border-b border-slate-200 px-4 py-3 text-left font-semibold whitespace-nowrap">
+                        Received
+                      </th>,
+                    ]
+                    : []),
+                ])}
+                <th className="border-b border-r border-slate-200 bg-slate-50/70 px-4 py-3 text-left font-semibold whitespace-nowrap">
                   Remarks Delivery
                 </th>
                 {onCheck ? (
-                  <th className="border-b border-slate-200 px-4 py-3 text-left font-semibold whitespace-nowrap">
+                  <th className="border-b border-r border-slate-200 bg-slate-100 px-4 py-3 text-left font-semibold whitespace-nowrap">
                     Action
                   </th>
                 ) : null}
@@ -320,36 +329,37 @@ function QueueTable({
             </thead>
             <tbody>
               {rows.map((row) => (
-                <tr key={row.orderId} className="align-top odd:bg-white even:bg-slate-50/60">
+                <tr key={row.orderId} className="align-top">
                   <TextCell value={row.kodeOrder} strong />
                   <TextCell value={row.tanggalOrder} />
                   <TextCell value={row.shift} />
                   <TextCell value={row.dayNight} />
                   <TextCell value={row.truckType} />
                   <NumericCell value={row.ritaseRequest} />
-                  {metricColumns.map((column) => (
+                  {metricColumns.flatMap((column) => [
                     <NumericCell
                       key={`${row.orderId}-${column.key}-request`}
                       value={getRequestQty(row, column.key)}
-                    />
-                  ))}
-                  {metricColumns.map((column) => (
+                      group={column.key}
+                    />,
                     <NumericCell
                       key={`${row.orderId}-${column.key}-delivery`}
                       value={row[column.key].delivery}
-                    />
-                  ))}
-                  {showReceived
-                    ? metricColumns.map((column) => (
+                      group={column.key}
+                    />,
+                    ...(showReceived
+                      ? [
                         <NumericCell
                           key={`${row.orderId}-${column.key}-received`}
                           value={row[column.key].received ?? 0}
-                        />
-                      ))
-                    : null}
+                          group={column.key}
+                        />,
+                      ]
+                      : []),
+                  ])}
                   <RemarksCell value={row.remarksDelivery} />
                   {onCheck ? (
-                    <td className="border-b border-slate-200 px-4 py-3 whitespace-nowrap">
+                    <td className="border-b border-r border-slate-200 bg-slate-50/70 px-4 py-3 whitespace-nowrap">
                       <button
                         type="button"
                         onClick={() => onCheck(row)}
@@ -620,7 +630,7 @@ function MetricRow({
 function TextCell({ value, strong }: { value: string; strong?: boolean }) {
   return (
     <td
-      className={`border-b border-slate-200 px-4 py-3 text-slate-700 ${
+      className={`border-b border-r border-slate-200 bg-white px-4 py-3 text-slate-700 ${
         strong ? "whitespace-nowrap font-medium text-slate-900" : ""
       }`}
     >
@@ -629,9 +639,9 @@ function TextCell({ value, strong }: { value: string; strong?: boolean }) {
   );
 }
 
-function NumericCell({ value }: { value: number }) {
+function NumericCell({ value, group }: { value: number; group?: ReceivingMetricKey }) {
   return (
-    <td className="border-b border-slate-200 px-4 py-3 text-right whitespace-nowrap text-slate-700">
+    <td className={`border-b border-r border-slate-200 px-4 py-3 text-right whitespace-nowrap text-slate-700 tabular-nums ${group ? getReceivingGroupCellClassName(group) : "bg-white"}`}>
       {formatNumber(value)}
     </td>
   );
@@ -639,10 +649,57 @@ function NumericCell({ value }: { value: number }) {
 
 function RemarksCell({ value }: { value: string }) {
   return (
-    <td className="border-b border-slate-200 px-4 py-3 text-left text-slate-700">
+    <td className="border-b border-r border-slate-200 bg-slate-50/70 px-4 py-3 text-left text-slate-700">
       <div className="min-w-[220px] whitespace-pre-wrap break-words">{value}</div>
     </td>
   );
+}
+
+function buildReceivingColumnGroups(showReceived: boolean, showAction: boolean) {
+  return [
+    { key: "identity", label: "Informasi", colSpan: 6, className: "bg-slate-100 text-slate-700" },
+    ...metricColumns.map((column) => ({
+      key: column.key,
+      label: getReceivingMetricLabel(column.key),
+      colSpan: showReceived ? 3 : 2,
+      className: getReceivingGroupHeaderClassName(column.key),
+    })),
+    { key: "remarks", label: "Remarks", colSpan: 1, className: "bg-slate-100 text-slate-700" },
+    ...(showAction ? [{ key: "action", label: "Action", colSpan: 1, className: "bg-slate-900 text-white" }] : []),
+  ];
+}
+
+function getReceivingMetricLabel(key: ReceivingMetricKey) {
+  const labels: Record<ReceivingMetricKey, string> = {
+    cb1tr: "CB 1TR",
+    cb2tr: "CB 2TR",
+    camNo01: "Cam 01",
+    camNo02: "Cam 02",
+    cr1tr: "CR 1TR",
+  };
+  return labels[key];
+}
+
+function getReceivingGroupHeaderClassName(key: ReceivingMetricKey) {
+  const classes: Record<ReceivingMetricKey, string> = {
+    cb1tr: "bg-emerald-50 text-emerald-900",
+    cb2tr: "bg-sky-50 text-sky-900",
+    camNo01: "bg-violet-50 text-violet-900",
+    camNo02: "bg-rose-50 text-rose-900",
+    cr1tr: "bg-amber-50 text-amber-900",
+  };
+  return classes[key];
+}
+
+function getReceivingGroupCellClassName(key: ReceivingMetricKey) {
+  const classes: Record<ReceivingMetricKey, string> = {
+    cb1tr: "bg-emerald-50/40",
+    cb2tr: "bg-sky-50/50",
+    camNo01: "bg-violet-50/40",
+    camNo02: "bg-rose-50/40",
+    cr1tr: "bg-amber-50/50",
+  };
+  return classes[key];
 }
 
 function getReceivingCheckMode(

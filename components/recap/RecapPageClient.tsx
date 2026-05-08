@@ -54,7 +54,7 @@ const metricHeaderClassNames: Record<RecapMetricKey, string> = {
 };
 
 const columnGroups: ColumnGroup[] = [
-  { key: "identity", label: "Info", colSpan: 3, className: "bg-slate-100 text-slate-700" },
+  { key: "identity", label: "Informasi", colSpan: 3, className: "bg-slate-100 text-slate-700" },
   ...RECAP_METRIC_CONFIGS.map((config) => ({
     key: config.key,
     label: config.label,

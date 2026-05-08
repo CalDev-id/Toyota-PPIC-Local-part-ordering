@@ -346,46 +346,53 @@ export default function PlanningPageClient() {
         ) : (
           <>
             <div className="overflow-x-auto">
-              <table className="min-w-full border-collapse text-sm">
-                <thead className="bg-slate-100/90 text-slate-700">
+              <table className="min-w-full border-separate border-spacing-0 text-sm">
+                <thead className="text-slate-700">
                   <tr>
-                    <TableHead label="Tanggal" className="min-w-[140px]" />
-                    <TableHead label="Shift" />
-                    <TableHead label="Day/Night" />
-                    <TableHead label="StawCB1TRjun" />
-                    <TableHead label="StawCB2TRjun" />
-                    <TableHead label="StawCB1TREm" />
-                    <TableHead label="StawCB2TREm" />
-                    <TableHead label="StawCR1TR" />
-                    <TableHead label="StawCA01" />
-                    <TableHead label="StawCA02" />
-                    <TableHead label="Plan_Prod_CR1TR" />
-                    <TableHead label="Plan_Prod_CB1TR" />
-                    <TableHead label="Plan_Prod_CB2TR" />
-                    <TableHead label="Plan_Prod_Cam01" />
-                    <TableHead label="Plan_Prod_Cam02" />
-                    <TableHead label="Aksi" />
+                    <GroupedTableHead label="Informasi" colSpan={3} className="bg-slate-100 text-slate-700" />
+                    <GroupedTableHead label="Stock Awal Junbiki" colSpan={2} className="bg-emerald-50 text-emerald-900" />
+                    <GroupedTableHead label="Stock Awal Emergency" colSpan={5} className="bg-sky-50 text-sky-900" />
+                    <GroupedTableHead label="Plan Produksi" colSpan={5} className="bg-amber-50 text-amber-900" />
+                    <GroupedTableHead label="Action" colSpan={1} className="bg-slate-900 text-white" />
+                  </tr>
+                  <tr>
+                    <TableHead label="Tanggal" className="min-w-[140px] bg-white" />
+                    <TableHead label="Shift" className="bg-white" />
+                    <TableHead label="Day/Night" className="bg-white" />
+                    <TableHead label="CB 1TR" className="bg-emerald-50/60 text-right" />
+                    <TableHead label="CB 2TR" className="bg-emerald-50/60 text-right" />
+                    <TableHead label="CB 1TR" className="bg-sky-50/70 text-right" />
+                    <TableHead label="CB 2TR" className="bg-sky-50/70 text-right" />
+                    <TableHead label="CR 1TR" className="bg-sky-50/70 text-right" />
+                    <TableHead label="Cam 01" className="bg-sky-50/70 text-right" />
+                    <TableHead label="Cam 02" className="bg-sky-50/70 text-right" />
+                    <TableHead label="CR 1TR" className="bg-amber-50/70 text-right" />
+                    <TableHead label="CB 1TR" className="bg-amber-50/70 text-right" />
+                    <TableHead label="CB 2TR" className="bg-amber-50/70 text-right" />
+                    <TableHead label="Cam 01" className="bg-amber-50/70 text-right" />
+                    <TableHead label="Cam 02" className="bg-amber-50/70 text-right" />
+                    <TableHead label="Aksi" className="bg-slate-100" />
                   </tr>
                 </thead>
                 <tbody>
                   {paginatedRecords.map((record) => (
-                    <tr key={record.planId} className="align-top odd:bg-white even:bg-slate-50/60">
-                      <TableCell value={record.tanggal} className="min-w-[140px] whitespace-nowrap" />
-                      <TableCell value={record.shift} />
-                      <TableCell value={record.dayNight || "-"} />
-                      <TableCell value={formatNumber(record.stockAwalJunbikiCb1tr)} />
-                      <TableCell value={formatNumber(record.stockAwalJunbikiCb2tr)} />
-                      <TableCell value={formatNumber(record.stockAwalEmergencyCb1tr)} />
-                      <TableCell value={formatNumber(record.stockAwalEmergencyCb2tr)} />
-                      <TableCell value={formatNumber(record.stockAwalEmergencyCr1tr)} />
-                      <TableCell value={formatNumber(record.stockAwalEmergencyCam01)} />
-                      <TableCell value={formatNumber(record.stockAwalEmergencyCam02)} />
-                      <TableCell value={formatNumber(record.planProdCr1tr)} />
-                      <TableCell value={formatNumber(record.planProdCb1tr)} />
-                      <TableCell value={formatNumber(record.planProdCb2tr)} />
-                      <TableCell value={formatNumber(record.planProdCam01)} />
-                      <TableCell value={formatNumber(record.planProdCam02)} />
-                      <td className="border-b border-slate-200 px-4 py-3 whitespace-nowrap">
+                    <tr key={record.planId} className="align-top">
+                      <TableCell value={record.tanggal} className="min-w-[140px] whitespace-nowrap bg-white font-medium text-slate-900" />
+                      <TableCell value={record.shift} className="bg-white" />
+                      <TableCell value={record.dayNight || "-"} className="bg-white" />
+                      <TableCell value={formatNumber(record.stockAwalJunbikiCb1tr)} className="bg-emerald-50/40 text-right tabular-nums" />
+                      <TableCell value={formatNumber(record.stockAwalJunbikiCb2tr)} className="bg-emerald-50/40 text-right tabular-nums" />
+                      <TableCell value={formatNumber(record.stockAwalEmergencyCb1tr)} className="bg-sky-50/50 text-right tabular-nums" />
+                      <TableCell value={formatNumber(record.stockAwalEmergencyCb2tr)} className="bg-sky-50/50 text-right tabular-nums" />
+                      <TableCell value={formatNumber(record.stockAwalEmergencyCr1tr)} className="bg-sky-50/50 text-right tabular-nums" />
+                      <TableCell value={formatNumber(record.stockAwalEmergencyCam01)} className="bg-sky-50/50 text-right tabular-nums" />
+                      <TableCell value={formatNumber(record.stockAwalEmergencyCam02)} className="bg-sky-50/50 text-right tabular-nums" />
+                      <TableCell value={formatNumber(record.planProdCr1tr)} className="bg-amber-50/50 text-right tabular-nums" />
+                      <TableCell value={formatNumber(record.planProdCb1tr)} className="bg-amber-50/50 text-right tabular-nums" />
+                      <TableCell value={formatNumber(record.planProdCb2tr)} className="bg-amber-50/50 text-right tabular-nums" />
+                      <TableCell value={formatNumber(record.planProdCam01)} className="bg-amber-50/50 text-right tabular-nums" />
+                      <TableCell value={formatNumber(record.planProdCam02)} className="bg-amber-50/50 text-right tabular-nums" />
+                      <td className="border-b border-r border-slate-200 bg-slate-50/70 px-4 py-3 whitespace-nowrap">
                         <div className="flex gap-2">
                           <button
                             type="button"
@@ -680,7 +687,26 @@ function TableHead({
   className?: string;
 }) {
   return (
-    <th className={`border-b border-slate-200 px-4 py-3 text-left font-semibold whitespace-nowrap ${className ?? ""}`}>
+    <th className={`border-b border-r border-slate-200 px-4 py-3 text-left font-semibold whitespace-nowrap ${className ?? ""}`}>
+      {label}
+    </th>
+  );
+}
+
+function GroupedTableHead({
+  label,
+  colSpan,
+  className,
+}: {
+  label: string;
+  colSpan: number;
+  className?: string;
+}) {
+  return (
+    <th
+      colSpan={colSpan}
+      className={`border-b border-r border-slate-200 px-4 py-3 text-center text-xs font-bold uppercase tracking-[0.12em] whitespace-nowrap ${className ?? ""}`}
+    >
       {label}
     </th>
   );
@@ -693,7 +719,7 @@ function TableCell({
   value: string;
   className?: string;
 }) {
-  return <td className={`border-b border-slate-200 px-4 py-3 text-slate-700 ${className ?? ""}`}>{value}</td>;
+  return <td className={`border-b border-r border-slate-200 px-4 py-3 text-slate-700 ${className ?? ""}`}>{value}</td>;
 }
 
 function formatDateTime(value: string) {
