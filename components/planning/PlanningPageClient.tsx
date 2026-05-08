@@ -34,7 +34,8 @@ type ToastState = {
 } | null;
 
 const shiftOptions = ["RED", "WHITE"];
-const PAGE_SIZE = 7;
+const PAGE_SIZE = 10;
+const MAX_VISIBLE_PAGES = 5;
 
 export default function PlanningPageClient() {
   const [records, setRecords] = useState<PlanningRecord[]>([]);
@@ -214,6 +215,7 @@ export default function PlanningPageClient() {
     (safeCurrentPage - 1) * PAGE_SIZE,
     safeCurrentPage * PAGE_SIZE
   );
+  const visiblePages = getVisiblePages(safeCurrentPage, totalPages);
   const latestRecord = filteredSummaryRecords[0] ?? null;
   const summaryCards = [
     {
@@ -420,7 +422,7 @@ export default function PlanningPageClient() {
                 >
                   Prev
                 </button>
-                {Array.from({ length: totalPages }, (_, index) => index + 1).map((page) => (
+                {visiblePages.map((page) => (
                   <button
                     key={page}
                     type="button"
@@ -703,6 +705,17 @@ function formatNumber(value: number) {
 
 function getTodayInputValue() {
   return new Date().toISOString().slice(0, 10);
+}
+
+function getVisiblePages(currentPage: number, totalPages: number) {
+  const pageCount = Math.min(totalPages, MAX_VISIBLE_PAGES);
+  const halfWindow = Math.floor(pageCount / 2);
+  let start = Math.max(1, currentPage - halfWindow);
+  const maxStart = Math.max(1, totalPages - pageCount + 1);
+
+  start = Math.min(start, maxStart);
+
+  return Array.from({ length: pageCount }, (_, index) => start + index);
 }
 
 function buildEmptyForm(tanggal = getTodayInputValue()): PlanningFormValues {

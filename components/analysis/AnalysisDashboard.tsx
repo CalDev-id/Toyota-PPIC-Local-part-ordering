@@ -8,6 +8,7 @@ import type {
   AnalysisKpiKey,
   AnalysisKpiSummary,
 } from "@/lib/analysis";
+import { useState } from "react";
 
 type AnalysisDashboardProps = {
   data: AnalysisDashboardData;
@@ -206,6 +207,15 @@ function MultiLineChart<T extends { date: string; label: string }>({
   maxValue?: number;
   valueFormatter: (value: number) => string;
 }) {
+  const [tooltip, setTooltip] = useState<{
+    x: number;
+    y: number;
+    placement: "top" | "bottom";
+    label: string;
+    seriesLabel: string;
+    value: number;
+    color: string;
+  } | null>(null);
   const width = 520;
   const height = 320;
   const chartLeft = 56;
@@ -237,7 +247,7 @@ function MultiLineChart<T extends { date: string; label: string }>({
         ))}
       </div>
 
-      <div className="mt-5 overflow-x-auto">
+      <div className="relative mt-5 overflow-x-auto" onMouseLeave={() => setTooltip(null)}>
         <svg viewBox={`0 0 ${width} ${height}`} className="h-[20rem] w-full min-w-[460px]">
           <line x1={chartLeft} y1={chartTop} x2={chartLeft} y2={chartBottom} stroke="#e2e8f0" strokeWidth="2" />
           <line x1={chartLeft} y1={chartBottom} x2={width - chartRight} y2={chartBottom} stroke="#e2e8f0" strokeWidth="2" />
@@ -274,17 +284,47 @@ function MultiLineChart<T extends { date: string; label: string }>({
                   strokeLinecap="round"
                   strokeLinejoin="round"
                 />
-                {safeData.map((point, index) => (
-                  <circle
-                    key={`${item.key}-${point.date}`}
-                    cx={getX(index)}
-                    cy={getY(item.getValue(point))}
-                    r="5"
-                    fill={item.color}
-                    stroke="white"
-                    strokeWidth="2"
-                  />
-                ))}
+                {safeData.map((point, index) => {
+                  const value = item.getValue(point);
+                  const x = getX(index);
+                  const y = getY(value);
+
+                  return (
+                    <circle
+                      key={`${item.key}-${point.date}`}
+                      cx={x}
+                      cy={y}
+                      r="6"
+                      fill={item.color}
+                      stroke="white"
+                      strokeWidth="2"
+                      className="cursor-pointer transition-opacity hover:opacity-80"
+                      onMouseEnter={() =>
+                        setTooltip({
+                          x: (x / width) * 100,
+                          y: ((y < chartTop + 34 ? y + 16 : y - 10) / height) * 100,
+                          placement: y < chartTop + 34 ? "bottom" : "top",
+                          label: point.label,
+                          seriesLabel: item.label,
+                          value,
+                          color: item.color,
+                        })
+                      }
+                      onFocus={() =>
+                        setTooltip({
+                          x: (x / width) * 100,
+                          y: ((y < chartTop + 34 ? y + 16 : y - 10) / height) * 100,
+                          placement: y < chartTop + 34 ? "bottom" : "top",
+                          label: point.label,
+                          seriesLabel: item.label,
+                          value,
+                          color: item.color,
+                        })
+                      }
+                      onMouseLeave={() => setTooltip(null)}
+                    />
+                  );
+                })}
               </g>
             );
           }) : null}
@@ -295,6 +335,26 @@ function MultiLineChart<T extends { date: string; label: string }>({
             </text>
           ))}
         </svg>
+        {tooltip ? (
+          <div
+            className={`pointer-events-none absolute z-10 -translate-x-[var(--tooltip-translate-x)] rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs shadow-lg ${
+              tooltip.placement === "top" ? "-translate-y-full" : "translate-y-0"
+            }`}
+            style={{
+              left: `${tooltip.x}%`,
+              top: `${tooltip.y}%`,
+              ["--tooltip-translate-x" as string]: getTooltipTranslateX(tooltip.x),
+            }}
+          >
+            <div className="flex items-center gap-2 font-semibold text-slate-900">
+              <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: tooltip.color }} />
+              <span>{tooltip.label}</span>
+            </div>
+            <p className="mt-1 text-slate-600">
+              {tooltip.seriesLabel}: <span className="font-semibold text-slate-900">{formatQuantity(tooltip.value)}</span>
+            </p>
+          </div>
+        ) : null}
       </div>
     </article>
   );
@@ -373,6 +433,22 @@ function formatPercent(value: number) {
 
 function formatDelta(value: number) {
   return `${value.toFixed(1)}%`;
+}
+
+function getTooltipTranslateX(x: number) {
+  if (x > 82) {
+    return "100%";
+  }
+
+  if (x < 18) {
+    return "0%";
+  }
+
+  return "50%";
+}
+
+function formatQuantity(value: number) {
+  return new Intl.NumberFormat("id-ID").format(Math.round(value));
 }
 
 function formatCompactQuantity(value: number) {

@@ -1,18 +1,14 @@
+"use client";
+
 import AutoSubmitReportFilters from "@/components/shared/AutoSubmitReportFilters";
 import type { HomeDashboardData, HomeKpi, HomeKpiKey } from "@/lib/home-dashboard";
-import type { WeeklyQuantityPoint } from "@/lib/analysis";
+import type { ItemMetricPoint } from "@/lib/analysis";
+import { useState } from "react";
 import type React from "react";
 
 type HomeDashboardProps = {
   data: HomeDashboardData;
   errorMessage?: string | null;
-};
-
-type LineSeries = {
-  key: string;
-  label: string;
-  color: string;
-  getValue: (point: WeeklyQuantityPoint) => number;
 };
 
 const kpiToneClassMap: Record<HomeKpi["tone"], string> = {
@@ -59,13 +55,6 @@ const kpiIconMap: Record<HomeKpiKey, React.ReactNode> = {
   ),
 };
 
-const trendSeries: LineSeries[] = [
-  { key: "plan", label: "Plan", color: "#0ea5e9", getValue: (point) => point.planQty },
-  { key: "order", label: "Order", color: "#f59e0b", getValue: (point) => point.orderQty },
-  { key: "confirmed", label: "Confirmed", color: "#10b981", getValue: (point) => point.confirmedQty },
-  { key: "received", label: "Received", color: "#64748b", getValue: (point) => point.receivedQty },
-];
-
 export default function HomeDashboard({ data, errorMessage }: HomeDashboardProps) {
   return (
     <section className="space-y-5">
@@ -99,7 +88,7 @@ export default function HomeDashboard({ data, errorMessage }: HomeDashboardProps
       </section>
 
       <section className="grid gap-5 xl:grid-cols-[minmax(0,1.6fr)_minmax(320px,0.8fr)]">
-        <TrendChart title="Achievement" data={data.trend} series={trendSeries} />
+        <PlanOrderConfirmedReceivedChart data={data.requestVsConfirmedPerItem} />
         <PlanCoverageChart data={data} />
       </section>
     </section>
@@ -125,30 +114,42 @@ function KpiCard({ kpi }: { kpi: HomeKpi }) {
   );
 }
 
-function TrendChart({
-  title,
+function PlanOrderConfirmedReceivedChart({
   data,
-  series,
 }: {
-  title: string;
-  data: WeeklyQuantityPoint[];
-  series: LineSeries[];
+  data: ItemMetricPoint[];
 }) {
+  const [tooltip, setTooltip] = useState<{
+    x: number;
+    y: number;
+    item: string;
+    label: string;
+    value: number;
+    color: string;
+  } | null>(null);
   const width = 920;
-  const height = 330;
+  const height = 350;
   const chartLeft = 58;
   const chartRight = 26;
   const chartTop = 46;
-  const chartBottom = 260;
+  const chartBottom = 282;
   const chartWidth = width - chartLeft - chartRight;
   const chartHeight = chartBottom - chartTop;
-  const rawMax = Math.max(...data.flatMap((point) => series.map((item) => item.getValue(point))), 1);
+  const rawMax = Math.max(...data.flatMap((item) => [item.plan, item.request, item.confirmed, item.received]), 1);
   const yMax = getRoundedMax(rawMax);
-  const xStep = chartWidth / Math.max(data.length - 1, 1);
+  const groupWidth = chartWidth / Math.max(data.length, 1);
+  const barGap = 5;
+  const rawBarWidth = (groupWidth - barGap * 3) / 5.2;
+  const barWidth = Math.min(18, Math.max(rawBarWidth, 8));
+  const groupPadding = Math.max((groupWidth - barWidth * 4 - barGap * 3) / 2, 8);
   const ticks = [0, 0.25, 0.5, 0.75, 1];
 
-  function getX(index: number) {
-    return chartLeft + index * xStep;
+  function getGroupX(index: number) {
+    return chartLeft + index * groupWidth;
+  }
+
+  function getBarX(groupIndex: number, barIndex: number) {
+    return getGroupX(groupIndex) + groupPadding + barIndex * (barWidth + barGap);
   }
 
   function getY(value: number) {
@@ -159,18 +160,19 @@ function TrendChart({
     <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h2 className="text-lg font-bold text-slate-950">{title}</h2>
-          <p className="mt-1 text-sm text-slate-500">Plan, order, confirmed, dan received</p>
+          <h2 className="text-lg font-bold text-slate-950">Plan vs Order vs Confirmed vs Received</h2>
+          <p className="mt-1 text-sm text-slate-500">Bandingkan target plan, order aktual, qty confirmed, dan received per item.</p>
         </div>
         <div className="flex flex-wrap gap-x-4 gap-y-2 text-xs font-medium text-slate-600">
-          {series.map((item) => (
-            <LegendItem key={item.key} color={item.color} label={item.label} />
-          ))}
+          <LegendItem color="#94a3b8" label="Plan" />
+          <LegendItem color="#0ea5e9" label="Order" />
+          <LegendItem color="#10b981" label="Confirmed" />
+          <LegendItem color="#64748b" label="Received" />
         </div>
       </div>
 
-      <div className="overflow-x-auto">
-        <svg viewBox={`0 0 ${width} ${height}`} className="h-[20rem] w-full min-w-[820px]">
+      <div className="relative overflow-x-auto" onMouseLeave={() => setTooltip(null)}>
+        <svg viewBox={`0 0 ${width} ${height}`} className="h-[21.5rem] w-full min-w-[820px]">
           <line x1={chartLeft} y1={chartTop} x2={chartLeft} y2={chartBottom} stroke="#e2e8f0" strokeWidth="2" />
           <line x1={chartLeft} y1={chartBottom} x2={width - chartRight} y2={chartBottom} stroke="#e2e8f0" strokeWidth="2" />
 
@@ -195,41 +197,100 @@ function TrendChart({
           ) : null}
 
           {data.length > 0
-            ? series.map((item) => {
-                const points = data.map((point, index) => `${getX(index)},${getY(item.getValue(point))}`).join(" ");
+            ? data.map((item, index) => {
+                const bars = [
+                  { key: "plan", label: "Plan", value: item.plan, color: "#94a3b8" },
+                  { key: "order", label: "Order", value: item.request, color: "#0ea5e9" },
+                  { key: "confirmed", label: "Confirmed", value: item.confirmed, color: "#10b981" },
+                  { key: "received", label: "Received", value: item.received, color: "#64748b" },
+                ];
 
                 return (
                   <g key={item.key}>
-                    <polyline
-                      points={points}
-                      fill="none"
-                      stroke={item.color}
-                      strokeWidth="4"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                    {data.map((point, index) => (
-                      <circle
-                        key={`${item.key}-${point.date}`}
-                        cx={getX(index)}
-                        cy={getY(item.getValue(point))}
-                        r="5"
-                        fill={item.color}
-                        stroke="white"
-                        strokeWidth="2"
-                      />
-                    ))}
+                    {bars.map((bar, barIndex) => {
+                      const y = getY(bar.value);
+
+                      const x = getBarX(index, barIndex);
+                      const barHeight = Math.max(chartBottom - y, 2);
+
+                      return (
+                        <rect
+                          key={bar.key}
+                          x={x}
+                          y={y}
+                          width={barWidth}
+                          height={barHeight}
+                          rx="4"
+                          fill={bar.color}
+                          className="cursor-pointer transition-opacity hover:opacity-80"
+                          onMouseEnter={() =>
+                            setTooltip({
+                              x: ((x + barWidth / 2) / width) * 100,
+                              y: (Math.max(y - 10, chartTop) / height) * 100,
+                              item: item.label,
+                              label: bar.label,
+                              value: bar.value,
+                              color: bar.color,
+                            })
+                          }
+                          onFocus={() =>
+                            setTooltip({
+                              x: ((x + barWidth / 2) / width) * 100,
+                              y: (Math.max(y - 10, chartTop) / height) * 100,
+                              item: item.label,
+                              label: bar.label,
+                              value: bar.value,
+                              color: bar.color,
+                            })
+                          }
+                          onMouseLeave={() => setTooltip(null)}
+                        />
+                      );
+                    })}
+                    <text
+                      x={getGroupX(index) + groupWidth / 2}
+                      y={chartBottom + 30}
+                      textAnchor="middle"
+                      className="fill-slate-600 text-[12px]"
+                    >
+                      {item.label}
+                    </text>
+                    <text
+                      x={getGroupX(index) + groupWidth / 2}
+                      y={chartBottom + 50}
+                      textAnchor="middle"
+                      className={`text-[11px] font-semibold ${item.gap > 0 ? "fill-amber-600" : "fill-emerald-600"}`}
+                    >
+                      Gap {formatCompactQuantity(item.gap)}
+                    </text>
                   </g>
                 );
               })
             : null}
 
-          {data.map((point, index) => (
-            <text key={point.date} x={getX(index)} y={chartBottom + 30} textAnchor="middle" className="fill-slate-600 text-[12px]">
-              {point.label}
+          {data.length === 0 ? (
+            <text x={width / 2} y={(chartTop + chartBottom) / 2} textAnchor="middle" className="fill-slate-400 text-[14px]">
+              Belum ada data
             </text>
-          ))}
+          ) : null}
         </svg>
+        {tooltip ? (
+          <div
+            className="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs shadow-lg"
+            style={{
+              left: `${tooltip.x}%`,
+              top: `${tooltip.y}%`,
+            }}
+          >
+            <div className="flex items-center gap-2 font-semibold text-slate-900">
+              <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: tooltip.color }} />
+              <span>{tooltip.item}</span>
+            </div>
+            <p className="mt-1 text-slate-600">
+              {tooltip.label}: <span className="font-semibold text-slate-900">{formatQuantity(tooltip.value)}</span>
+            </p>
+          </div>
+        ) : null}
       </div>
     </article>
   );

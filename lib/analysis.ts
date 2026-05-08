@@ -348,7 +348,16 @@ export async function getAnalysisDashboardData(filter: AnalysisFilter): Promise<
   }
 
   const itemMetrics: ItemMetricPoint[] = ITEM_DEFINITIONS.map((definition) => {
-    const totals = sumQuantityPoints(weeklyItemQuantity.find((item) => item.key === definition.key)?.points ?? []);
+    const totals =
+      weeklyItemQuantity.find((item) => item.key === definition.key)?.points.find((point) => point.date === filter.date) ??
+      {
+        date: filter.date,
+        label: formatShortDateLabel(filter.date),
+        planQty: 0,
+        orderQty: 0,
+        confirmedQty: 0,
+        receivedQty: 0,
+      };
 
     return {
       key: definition.key,

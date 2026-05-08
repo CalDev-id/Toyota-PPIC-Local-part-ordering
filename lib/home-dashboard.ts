@@ -5,6 +5,7 @@ import {
   type AnalysisDashboardData,
   type AnalysisFilter,
   type AnalysisFilterOptions,
+  type ItemMetricPoint,
   type WeeklyAccuracyPoint,
   type WeeklyQuantityPoint,
 } from "@/lib/analysis";
@@ -31,6 +32,7 @@ export type HomeDashboardData = {
   filterOptions: AnalysisFilterOptions;
   kpis: HomeKpi[];
   accuracy: HomeAccuracy[];
+  requestVsConfirmedPerItem: ItemMetricPoint[];
   trend: WeeklyQuantityPoint[];
   accuracyTrend: WeeklyAccuracyPoint[];
   totals: {
@@ -154,6 +156,7 @@ function mapAnalysisToHomeDashboard(
         helper: "Received dibanding confirmed",
       },
     ],
+    requestVsConfirmedPerItem: analysisData.requestVsConfirmedPerItem,
     trend: analysisData.rangeQuantity,
     accuracyTrend: createAccuracyTrend(analysisData.rangeQuantity),
     totals: {
