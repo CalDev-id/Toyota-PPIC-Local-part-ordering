@@ -5,9 +5,8 @@ import type {
   AnalysisDashboardData,
   AnalysisFilter,
   AnalysisFilterOptions,
-  DailyVolumePoint,
-  ItemMetricPoint,
-  WeeklyPlanRequestConfirmedPoint,
+  AnalysisKpiKey,
+  AnalysisKpiSummary,
 } from "@/lib/analysis";
 
 type AnalysisDashboardProps = {
@@ -16,6 +15,26 @@ type AnalysisDashboardProps = {
   filterOptions: AnalysisFilterOptions;
   errorMessage?: string | null;
 };
+
+type LineSeries<T> = {
+  key: string;
+  label: string;
+  color: string;
+  getValue: (point: T) => number;
+};
+
+const kpiIconMap: Record<AnalysisKpiKey, "target" | "clipboard" | "box"> = {
+  planAccuracy: "target",
+  orderAccuracy: "clipboard",
+  receivingAccuracy: "box",
+};
+
+const seriesColors = {
+  plan: "#0ea5e9",
+  order: "#f59e0b",
+  confirmed: "#10b981",
+  received: "#64748b",
+} as const;
 
 export default function AnalysisDashboard({
   data,
@@ -28,10 +47,10 @@ export default function AnalysisDashboard({
       <div className="rounded-2xl border border-slate-200 bg-white/90 p-6 shadow-sm">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-indigo-700">Analysis</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-sky-700">Analysis</p>
             <h1 className="mt-2 text-2xl font-bold text-slate-900">Order Analysis Dashboard</h1>
             <p className="mt-2 text-sm text-slate-600">
-              Monitoring volume order harian dan perbandingan request vs confirmed.
+              Monitoring akurasi plan, order, dan receiving untuk filter aktif.
             </p>
           </div>
 
@@ -49,436 +68,317 @@ export default function AnalysisDashboard({
         </div>
       ) : null}
 
-      {/* <RequestConfirmedCircleChart
-        title="Request vs Confirmed"
-        subtitle={`Per item total untuk ${selectedFilter.shift} / ${selectedFilter.dayNight} pada ${formatDateOption(selectedFilter.date)}.`}
-        data={data.requestVsConfirmedPerItem}
-      /> */}
+      <div className="grid gap-5 xl:grid-cols-3">
+        <AnalysisColumn
+          kpi={getKpi(data.kpis, "planAccuracy")}
+          chartTitle="Plan vs Order (Qty)"
+          chartData={data.weeklyQuantity}
+          chartSeries={[
+            { key: "plan", label: "Plan Qty", color: seriesColors.plan, getValue: (point) => point.planQty },
+            { key: "order", label: "Order Qty", color: seriesColors.order, getValue: (point) => point.orderQty },
+          ]}
+        />
+        <AnalysisColumn
+          kpi={getKpi(data.kpis, "orderAccuracy")}
+          chartTitle="Order vs Confirmed (Qty)"
+          chartData={data.weeklyQuantity}
+          chartSeries={[
+            { key: "order", label: "Order Qty", color: seriesColors.order, getValue: (point) => point.orderQty },
+            { key: "confirmed", label: "Confirmed Qty", color: seriesColors.confirmed, getValue: (point) => point.confirmedQty },
+          ]}
+        />
+        <AnalysisColumn
+          kpi={getKpi(data.kpis, "receivingAccuracy")}
+          chartTitle="Confirmed vs Receiving (Qty)"
+          chartData={data.weeklyQuantity}
+          chartSeries={[
+            { key: "confirmed", label: "Confirmed Qty", color: seriesColors.confirmed, getValue: (point) => point.confirmedQty },
+            { key: "received", label: "Received Qty", color: seriesColors.received, getValue: (point) => point.receivedQty },
+          ]}
+        />
+      </div>
 
-      <PlanRequestConfirmedChart
-        title="Plan vs Request vs Confirmed"
-        subtitle={`Bandingkan target plan dengan request aktual dan qty confirmed per item untuk ${selectedFilter.shift} / ${selectedFilter.dayNight} pada ${formatDateOption(selectedFilter.date)}.`}
-        data={data.requestVsConfirmedPerItem}
-      />
+      <section className="space-y-4">
+        <div>
+          <h2 className="text-xl font-bold text-slate-950">Trend Per Item</h2>
+          <p className="mt-1 text-sm text-slate-500">Plan, order, confirmed, dan received per item dalam 7 hari ke belakang.</p>
+        </div>
 
-      <WeeklyPlanRequestConfirmedChart
-        title="Plan vs Request vs Confirmed 7 Hari"
-        subtitle={`Tren total plan, request, dan confirmed untuk 7 hari ke belakang hingga ${formatDateOption(selectedFilter.date)} pada ${selectedFilter.shift} / ${selectedFilter.dayNight}.`}
-        data={data.planRequestConfirmedWeekly}
-      />
-
-      {/* <DailyVolumeChart
-        title="Tren Request dan Delivery Harian"
-        subtitle={`Total request dan total delivery untuk 14 hari hingga ${formatDateOption(selectedFilter.date)}.`}
-        data={data.volumeOrderHarian}
-      /> */}
+        <div className="grid gap-5 lg:grid-cols-2">
+          {data.weeklyItemQuantity.map((item) => (
+            <MultiLineChart
+              key={item.key}
+              title={item.label}
+              data={item.points}
+              valueFormatter={formatCompactQuantity}
+              series={[
+                { key: "plan", label: "Plan", color: seriesColors.plan, getValue: (point) => point.planQty },
+                { key: "order", label: "Order", color: seriesColors.order, getValue: (point) => point.orderQty },
+                { key: "confirmed", label: "Confirmed", color: seriesColors.confirmed, getValue: (point) => point.confirmedQty },
+                { key: "received", label: "Received", color: seriesColors.received, getValue: (point) => point.receivedQty },
+              ]}
+            />
+          ))}
+        </div>
+      </section>
     </section>
   );
 }
 
-function DailyVolumeChart({
-  title,
-  subtitle,
-  data,
+function AnalysisColumn({
+  kpi,
+  chartTitle,
+  chartData,
+  chartSeries,
 }: {
-  title: string;
-  subtitle: string;
-  data: DailyVolumePoint[];
-}) {
-  const width = 1120;
-  const height = 320;
-  const chartLeft = 48;
-  const chartBottom = 248;
-  const chartTop = 28;
-  const chartRight = 24;
-  const maxValue = Math.max(...data.flatMap((item) => [item.requestTotal, item.deliveryTotal]), 1);
-  const chartHeight = chartBottom - chartTop;
-  const availableWidth = width - chartLeft - chartRight;
-  const groupWidth = availableWidth / Math.max(data.length, 1);
-  const barWidth = Math.min(22, Math.max(groupWidth / 3.2, 10));
-
-  return (
-    <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-      <header className="mb-4">
-        <h3 className="text-base font-semibold text-slate-900">{title}</h3>
-        <p className="text-sm text-slate-500">{subtitle}</p>
-      </header>
-
-      <div className="overflow-x-auto">
-        <svg viewBox={`0 0 ${width} ${height}`} className="h-[22rem] w-full min-w-[1040px]">
-          <line x1={chartLeft} y1={chartBottom} x2={width - chartRight} y2={chartBottom} className="stroke-slate-200" />
-          <line x1={chartLeft} y1={chartTop} x2={chartLeft} y2={chartBottom} className="stroke-slate-200" />
-
-          {[0, 0.25, 0.5, 0.75, 1].map((tick) => {
-            const y = chartBottom - chartHeight * tick;
-            const value = Math.round(maxValue * tick);
-            return (
-              <g key={tick}>
-                <line x1={chartLeft} y1={y} x2={width - chartRight} y2={y} className="stroke-slate-100" />
-                <text x={chartLeft - 10} y={y + 4} textAnchor="end" className="fill-slate-400 text-[12px]">
-                  {value}
-                </text>
-              </g>
-            );
-          })}
-
-          {data.map((item, index) => {
-            const baseX = chartLeft + index * groupWidth + groupWidth / 2;
-            const requestHeight = (item.requestTotal / maxValue) * chartHeight;
-            const deliveryHeight = (item.deliveryTotal / maxValue) * chartHeight;
-            return (
-              <g key={item.date}>
-                <rect
-                  x={baseX - barWidth - 3}
-                  y={chartBottom - requestHeight}
-                  width={barWidth}
-                  height={Math.max(requestHeight, 2)}
-                  rx="7"
-                  className="fill-sky-500"
-                />
-                <rect
-                  x={baseX + 3}
-                  y={chartBottom - deliveryHeight}
-                  width={barWidth}
-                  height={Math.max(deliveryHeight, 2)}
-                  rx="7"
-                  className="fill-emerald-500"
-                />
-                <text x={baseX} y={282} textAnchor="middle" className="fill-slate-500 text-[12px]">
-                  {item.label}
-                </text>
-              </g>
-            );
-          })}
-        </svg>
-      </div>
-
-      <div className="mt-3 flex flex-wrap gap-4 text-xs text-slate-600">
-        <LegendDot className="bg-sky-500" label="Total Request" />
-        <LegendDot className="bg-emerald-500" label="Total Delivery" />
-      </div>
-    </article>
-  );
-}
-
-function RequestConfirmedCircleChart({
-  title,
-  subtitle,
-  data,
-}: {
-  title: string;
-  subtitle: string;
-  data: ItemMetricPoint[];
+  kpi: AnalysisKpiSummary;
+  chartTitle: string;
+  chartData: AnalysisDashboardData["weeklyQuantity"];
+  chartSeries: Array<LineSeries<AnalysisDashboardData["weeklyQuantity"][number]>>;
 }) {
   return (
-    <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-      <header className="mb-4">
-        <h3 className="text-base font-semibold text-slate-900">{title}</h3>
-        <p className="text-sm text-slate-500">{subtitle}</p>
-      </header>
-
-      <div className="mb-4 flex flex-wrap gap-4 text-xs text-slate-600">
-        <LegendDot className="bg-sky-500" label="Request" />
-        <LegendDot className="bg-emerald-500" label="Confirmed" />
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-        {data.map((item) => (
-          <RequestConfirmedCircleCard key={item.key} item={item} />
-        ))}
-      </div>
-    </article>
-  );
-}
-
-function RequestConfirmedCircleCard({ item }: { item: ItemMetricPoint }) {
-  const totalValue = Math.max(item.request + item.confirmed, 1);
-  const radius = 56;
-  const stroke = 18;
-  const normalizedRadius = radius - stroke / 2;
-  const circumference = normalizedRadius * 2 * Math.PI;
-  const requestStroke = (item.request / totalValue) * circumference;
-
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-      <p className="text-sm font-semibold text-slate-900">{item.label}</p>
-      <div className="mt-4 flex justify-center">
-        <svg height="150" width="150" viewBox="0 0 150 150" className="shrink-0">
-          <g transform="rotate(-90 75 75)">
-            <circle
-              stroke="#e2e8f0"
-              fill="transparent"
-              strokeWidth={stroke}
-              r={normalizedRadius}
-              cx="75"
-              cy="75"
-            />
-            <circle
-              stroke="#0ea5e9"
-              fill="transparent"
-              strokeWidth={stroke}
-              strokeDasharray={`${requestStroke} ${circumference - requestStroke}`}
-              strokeLinecap="round"
-              r={normalizedRadius}
-              cx="75"
-              cy="75"
-            />
-            <circle
-              stroke="#10b981"
-              fill="transparent"
-              strokeWidth={stroke}
-              strokeDasharray={`${circumference - requestStroke} ${requestStroke}`}
-              strokeDashoffset={-requestStroke}
-              strokeLinecap="round"
-              r={normalizedRadius}
-              cx="75"
-              cy="75"
-            />
-          </g>
-        </svg>
-      </div>
-
-      <div className="mt-3 space-y-1 text-center">
-        <p className="text-sm font-semibold text-slate-900">Request {formatNumber(item.request)}</p>
-        <p className="text-sm font-semibold text-emerald-600">Confirmed {formatNumber(item.confirmed)}</p>
-      </div>
+    <div className="space-y-5">
+      <KpiCard kpi={kpi} icon={kpiIconMap[kpi.key]} />
+      <MultiLineChart
+        title={chartTitle}
+        data={chartData}
+        valueFormatter={formatCompactQuantity}
+        series={chartSeries}
+      />
     </div>
   );
 }
 
-function PlanRequestConfirmedChart({
+function KpiCard({
+  kpi,
+  icon,
+}: {
+  kpi: AnalysisKpiSummary;
+  icon: "target" | "clipboard" | "box";
+}) {
+  const isPositive = kpi.delta >= 0;
+
+  return (
+    <article className="flex min-h-[150px] items-center gap-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+      <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-full bg-sky-50 text-sky-600">
+        <KpiIcon icon={icon} />
+      </div>
+      <div className="min-w-0">
+        <h2 className="text-lg font-bold text-slate-950">{kpi.label}</h2>
+        <p className="mt-2 text-4xl font-bold leading-none text-sky-600 tabular-nums">
+          {formatPercent(kpi.value)}
+        </p>
+        <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+          <span className="font-medium text-slate-500">vs last week</span>
+          <span className={`font-bold tabular-nums ${isPositive ? "text-emerald-600" : "text-red-600"}`}>
+            {isPositive ? "▲" : "▼"} {formatDelta(Math.abs(kpi.delta))}
+          </span>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function getKpi(kpis: AnalysisKpiSummary[], key: AnalysisKpiKey) {
+  return kpis.find((kpi) => kpi.key === key) ?? { key, label: getKpiLabel(key), value: 0, delta: 0 };
+}
+
+function getKpiLabel(key: AnalysisKpiKey) {
+  const labels: Record<AnalysisKpiKey, string> = {
+    planAccuracy: "Plan Accuracy",
+    orderAccuracy: "Order Accuracy",
+    receivingAccuracy: "Receiving Accuracy",
+  };
+
+  return labels[key];
+}
+
+function MultiLineChart<T extends { date: string; label: string }>({
   title,
-  subtitle,
   data,
+  series,
+  maxValue,
+  valueFormatter,
 }: {
   title: string;
-  subtitle: string;
-  data: ItemMetricPoint[];
+  data: T[];
+  series: Array<LineSeries<T>>;
+  maxValue?: number;
+  valueFormatter: (value: number) => string;
 }) {
-  const width = 1120;
-  const height = 360;
-  const chartLeft = 52;
-  const chartBottom = 270;
-  const chartTop = 28;
+  const width = 520;
+  const height = 320;
+  const chartLeft = 56;
   const chartRight = 24;
-  const maxValue = Math.max(...data.flatMap((item) => [item.plan, item.request, item.confirmed]), 1);
+  const chartTop = 46;
+  const chartBottom = 252;
+  const chartWidth = width - chartLeft - chartRight;
   const chartHeight = chartBottom - chartTop;
-  const availableWidth = width - chartLeft - chartRight;
-  const groupWidth = availableWidth / Math.max(data.length, 1);
-  const barWidth = Math.min(18, Math.max(groupWidth / 5, 10));
+  const safeData = data;
+  const rawMax = Math.max(...safeData.flatMap((point) => series.map((item) => item.getValue(point))), 1);
+  const yMax = maxValue ?? getRoundedMax(rawMax);
+  const xStep = chartWidth / Math.max(safeData.length - 1, 1);
+  const ticks = [0, 0.25, 0.5, 0.75, 1];
+
+  function getX(index: number) {
+    return chartLeft + index * xStep;
+  }
+
+  function getY(value: number) {
+    return chartBottom - (Math.min(value, yMax) / yMax) * chartHeight;
+  }
 
   return (
     <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-      <header className="mb-4">
-        <h3 className="text-base font-semibold text-slate-900">{title}</h3>
-        <p className="text-sm text-slate-500">{subtitle}</p>
-      </header>
+      <h2 className="text-lg font-bold text-slate-950">{title}</h2>
+      <div className="mt-5 flex flex-wrap gap-x-5 gap-y-2 text-xs font-medium text-slate-600">
+        {series.map((item) => (
+          <LegendItem key={item.key} color={item.color} label={item.label} />
+        ))}
+      </div>
 
-      <div className="overflow-x-auto">
-        <svg viewBox={`0 0 ${width} ${height}`} className="h-[24rem] w-full min-w-[1040px]">
-          <line x1={chartLeft} y1={chartBottom} x2={width - chartRight} y2={chartBottom} className="stroke-slate-200" />
-          <line x1={chartLeft} y1={chartTop} x2={chartLeft} y2={chartBottom} className="stroke-slate-200" />
+      <div className="mt-5 overflow-x-auto">
+        <svg viewBox={`0 0 ${width} ${height}`} className="h-[20rem] w-full min-w-[460px]">
+          <line x1={chartLeft} y1={chartTop} x2={chartLeft} y2={chartBottom} stroke="#e2e8f0" strokeWidth="2" />
+          <line x1={chartLeft} y1={chartBottom} x2={width - chartRight} y2={chartBottom} stroke="#e2e8f0" strokeWidth="2" />
 
-          {[0, 0.25, 0.5, 0.75, 1].map((tick) => {
+          {ticks.map((tick) => {
             const y = chartBottom - chartHeight * tick;
-            const value = Math.round(maxValue * tick);
+            const value = yMax * tick;
             return (
               <g key={tick}>
-                <line x1={chartLeft} y1={y} x2={width - chartRight} y2={y} className="stroke-slate-100" />
-                <text x={chartLeft - 10} y={y + 4} textAnchor="end" className="fill-slate-400 text-[12px]">
-                  {value}
+                <line x1={chartLeft} y1={y} x2={width - chartRight} y2={y} stroke="#f1f5f9" strokeWidth="1" />
+                <text x={chartLeft - 12} y={y + 4} textAnchor="end" className="fill-slate-500 text-[12px]">
+                  {valueFormatter(value)}
                 </text>
               </g>
             );
           })}
 
-          {data.map((item, index) => {
-            const baseX = chartLeft + index * groupWidth + groupWidth / 2;
-            const planHeight = (item.plan / maxValue) * chartHeight;
-            const requestHeight = (item.request / maxValue) * chartHeight;
-            const confirmedHeight = (item.confirmed / maxValue) * chartHeight;
+          {safeData.length === 0 ? (
+            <text x={width / 2} y={(chartTop + chartBottom) / 2} textAnchor="middle" className="fill-slate-400 text-[14px]">
+              Belum ada data
+            </text>
+          ) : null}
+
+          {safeData.length > 0 ? series.map((item) => {
+            const points = safeData.map((point, index) => `${getX(index)},${getY(item.getValue(point))}`).join(" ");
 
             return (
               <g key={item.key}>
-                <rect
-                  x={baseX - barWidth * 1.5 - 6}
-                  y={chartBottom - planHeight}
-                  width={barWidth}
-                  height={Math.max(planHeight, 2)}
-                  rx="6"
-                  className="fill-slate-400"
+                <polyline
+                  points={points}
+                  fill="none"
+                  stroke={item.color}
+                  strokeWidth="4"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
                 />
-                <rect
-                  x={baseX - barWidth / 2}
-                  y={chartBottom - requestHeight}
-                  width={barWidth}
-                  height={Math.max(requestHeight, 2)}
-                  rx="6"
-                  className="fill-sky-500"
-                />
-                <rect
-                  x={baseX + barWidth / 2 + 6}
-                  y={chartBottom - confirmedHeight}
-                  width={barWidth}
-                  height={Math.max(confirmedHeight, 2)}
-                  rx="6"
-                  className="fill-emerald-500"
-                />
-
-                <text x={baseX} y={304} textAnchor="middle" className="fill-slate-600 text-[12px] font-medium">
-                  {item.label}
-                </text>
-                <text
-                  x={baseX}
-                  y={326}
-                  textAnchor="middle"
-                  className={`text-[11px] font-semibold ${item.gap > 0 ? "fill-amber-600" : "fill-emerald-600"}`}
-                >
-                  Gap {formatNumber(item.gap)}
-                </text>
+                {safeData.map((point, index) => (
+                  <circle
+                    key={`${item.key}-${point.date}`}
+                    cx={getX(index)}
+                    cy={getY(item.getValue(point))}
+                    r="5"
+                    fill={item.color}
+                    stroke="white"
+                    strokeWidth="2"
+                  />
+                ))}
               </g>
             );
-          })}
-        </svg>
-      </div>
+          }) : null}
 
-      <div className="mt-3 flex flex-wrap gap-4 text-xs text-slate-600">
-        <LegendDot className="bg-slate-400" label="Plan" />
-        <LegendDot className="bg-sky-500" label="Request" />
-        <LegendDot className="bg-emerald-500" label="Confirmed" />
+          {safeData.map((point, index) => (
+            <text key={point.date} x={getX(index)} y={chartBottom + 30} textAnchor="middle" className="fill-slate-600 text-[12px]">
+              {point.label}
+            </text>
+          ))}
+        </svg>
       </div>
     </article>
   );
 }
 
-function WeeklyPlanRequestConfirmedChart({
-  title,
-  subtitle,
-  data,
-}: {
-  title: string;
-  subtitle: string;
-  data: WeeklyPlanRequestConfirmedPoint[];
-}) {
-  const width = 1120;
-  const height = 360;
-  const chartLeft = 52;
-  const chartBottom = 286;
-  const chartTop = 28;
-  const chartRight = 24;
-  const maxValue = Math.max(...data.flatMap((item) => [item.planTotal, item.requestTotal, item.confirmedTotal]), 1);
-  const chartHeight = chartBottom - chartTop;
-  const availableWidth = width - chartLeft - chartRight;
-  const groupWidth = availableWidth / Math.max(data.length, 1);
-  const barWidth = Math.min(18, Math.max(groupWidth / 5, 10));
-
-  return (
-    <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-      <header className="mb-4">
-        <h3 className="text-base font-semibold text-slate-900">{title}</h3>
-        <p className="text-sm text-slate-500">{subtitle}</p>
-      </header>
-
-      <div className="overflow-x-auto">
-        <svg viewBox={`0 0 ${width} ${height}`} className="h-[24rem] w-full min-w-[1040px]">
-          <line x1={chartLeft} y1={chartBottom} x2={width - chartRight} y2={chartBottom} className="stroke-slate-200" />
-          <line x1={chartLeft} y1={chartTop} x2={chartLeft} y2={chartBottom} className="stroke-slate-200" />
-
-          {[0, 0.25, 0.5, 0.75, 1].map((tick) => {
-            const y = chartBottom - chartHeight * tick;
-            const value = Math.round(maxValue * tick);
-            return (
-              <g key={tick}>
-                <line x1={chartLeft} y1={y} x2={width - chartRight} y2={y} className="stroke-slate-100" />
-                <text x={chartLeft - 10} y={y + 4} textAnchor="end" className="fill-slate-400 text-[12px]">
-                  {value}
-                </text>
-              </g>
-            );
-          })}
-
-          {data.map((item, index) => {
-            const baseX = chartLeft + index * groupWidth + groupWidth / 2;
-            const planHeight = (item.planTotal / maxValue) * chartHeight;
-            const requestHeight = (item.requestTotal / maxValue) * chartHeight;
-            const confirmedHeight = (item.confirmedTotal / maxValue) * chartHeight;
-            const gap = item.requestTotal - item.confirmedTotal;
-
-            return (
-              <g key={item.date}>
-                <rect
-                  x={baseX - barWidth * 1.5 - 6}
-                  y={chartBottom - planHeight}
-                  width={barWidth}
-                  height={Math.max(planHeight, 2)}
-                  rx="6"
-                  className="fill-slate-400"
-                />
-                <rect
-                  x={baseX - barWidth / 2}
-                  y={chartBottom - requestHeight}
-                  width={barWidth}
-                  height={Math.max(requestHeight, 2)}
-                  rx="6"
-                  className="fill-sky-500"
-                />
-                <rect
-                  x={baseX + barWidth / 2 + 6}
-                  y={chartBottom - confirmedHeight}
-                  width={barWidth}
-                  height={Math.max(confirmedHeight, 2)}
-                  rx="6"
-                  className="fill-emerald-500"
-                />
-
-                <text x={baseX} y={320} textAnchor="middle" className="fill-slate-600 text-[12px] font-medium">
-                  {item.label}
-                </text>
-                <text
-                  x={baseX}
-                  y={342}
-                  textAnchor="middle"
-                  className={`text-[11px] font-semibold ${gap > 0 ? "fill-amber-600" : "fill-emerald-600"}`}
-                >
-                  Gap {formatNumber(gap)}
-                </text>
-              </g>
-            );
-          })}
-        </svg>
-      </div>
-
-      <div className="mt-3 flex flex-wrap gap-4 text-xs text-slate-600">
-        <LegendDot className="bg-slate-400" label="Plan" />
-        <LegendDot className="bg-sky-500" label="Request" />
-        <LegendDot className="bg-emerald-500" label="Confirmed" />
-      </div>
-    </article>
-  );
-}
-
-function LegendDot({ className, label }: { className: string; label: string }) {
+function LegendItem({ color, label }: { color: string; label: string }) {
   return (
     <span className="inline-flex items-center gap-2">
-      <span className={`h-2.5 w-2.5 rounded-full ${className}`} />
+      <span className="h-2.5 w-5 rounded-full" style={{ backgroundColor: color }} />
       <span>{label}</span>
     </span>
   );
 }
 
-function formatDateOption(value: string) {
-  const [year, month, day] = value.split("-").map(Number);
-  const date = new Date(Date.UTC(year, month - 1, day));
-  if (Number.isNaN(date.getTime())) {
-    return value;
+function KpiIcon({ icon }: { icon: "target" | "clipboard" | "box" }) {
+  const commonProps = {
+    className: "h-16 w-16",
+    fill: "none",
+    stroke: "currentColor",
+    strokeLinecap: "round" as const,
+    strokeLinejoin: "round" as const,
+    strokeWidth: 3.2,
+    viewBox: "0 0 64 64",
+  };
+
+  if (icon === "clipboard") {
+    return (
+      <svg {...commonProps} aria-hidden="true">
+        <path d="M23 12h18" />
+        <path d="M24 10h16v8H24z" />
+        <path d="M18 15h-4v40h27" />
+        <path d="M46 15h4v22" />
+        <path d="M23 28h14" />
+        <path d="M23 38h10" />
+        <circle cx="45" cy="47" r="11" fill="currentColor" stroke="none" />
+        <path d="m40 47 4 4 8-9" className="stroke-white" />
+      </svg>
+    );
   }
 
-  return new Intl.DateTimeFormat("id-ID", {
-    dateStyle: "medium",
-    timeZone: "UTC",
-  }).format(date);
+  if (icon === "box") {
+    return (
+      <svg {...commonProps} aria-hidden="true">
+        <path d="m16 22 16-9 16 9-16 9z" />
+        <path d="M16 22v19l16 10V31" />
+        <path d="M48 22v16" />
+        <circle cx="46" cy="46" r="11" fill="currentColor" stroke="none" />
+        <path d="m41 46 4 4 8-9" className="stroke-white" />
+      </svg>
+    );
+  }
+
+  return (
+    <svg {...commonProps} aria-hidden="true">
+      <circle cx="28" cy="36" r="20" />
+      <circle cx="28" cy="36" r="12" />
+      <circle cx="28" cy="36" r="5" fill="currentColor" stroke="none" />
+      <path d="M42 22 55 9" />
+      <path d="M47 9h8v8" />
+    </svg>
+  );
 }
 
-function formatNumber(value: number) {
-  return new Intl.NumberFormat("id-ID").format(value);
+function getRoundedMax(value: number) {
+  if (value <= 0) {
+    return 1;
+  }
+
+  const magnitude = 10 ** Math.max(Math.floor(Math.log10(value)) - 1, 0);
+  return Math.ceil(value / magnitude) * magnitude;
+}
+
+function formatPercent(value: number) {
+  return `${value.toFixed(1)}%`;
+}
+
+function formatDelta(value: number) {
+  return `${value.toFixed(1)}%`;
+}
+
+function formatCompactQuantity(value: number) {
+  if (value >= 1000) {
+    return `${Math.round(value / 1000)}K`;
+  }
+
+  return new Intl.NumberFormat("id-ID").format(Math.round(value));
 }

@@ -24,6 +24,7 @@ export default function DefaultLayout({ children }: DefaultLayoutProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const currentPage = getCurrentPageLabel(pathname);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -117,7 +118,7 @@ export default function DefaultLayout({ children }: DefaultLayoutProps) {
               </button>
               <div>
                 <p className="text-sm font-semibold text-slate-900">CCR Ordering</p>
-                <p className="text-xs text-slate-500">Dashboard</p>
+                <p className="text-xs text-slate-500">{currentPage}</p>
               </div>
             </div>
             <div className="flex items-center gap-3">
@@ -189,6 +190,29 @@ export default function DefaultLayout({ children }: DefaultLayoutProps) {
       </div>
     </div>
   );
+}
+
+function getCurrentPageLabel(pathname: string) {
+  if (pathname === "/") {
+    return "Home";
+  }
+
+  const routeLabels: Array<[string, string]> = [
+    ["/ordering/junbiki", "Junbiki Order"],
+    ["/ordering/pallet", "Pallet Order"],
+    ["/ordering/stock", "Stock"],
+    ["/ordering", "Ordering"],
+    ["/analysis", "Analysis"],
+    ["/planning", "Planning"],
+    ["/delivery", "Delivery"],
+    ["/receiving", "Receiving"],
+    ["/tracking", "Tracking"],
+    ["/recap", "Recap"],
+    ["/users", "Users"],
+    ["/profile", "Profile"],
+  ];
+
+  return routeLabels.find(([route]) => pathname.startsWith(route))?.[1] ?? "Dashboard";
 }
 
 function useMounted() {

@@ -109,7 +109,7 @@ export default function AutoSubmitReportFilters({
         >
           {filterOptions.shifts.map((shift) => (
             <option key={shift} value={shift}>
-              {shift || "Tanpa Shift"}
+              {formatFilterOptionLabel(shift, "Tanpa Shift")}
             </option>
           ))}
         </SelectField>
@@ -123,7 +123,7 @@ export default function AutoSubmitReportFilters({
         >
           {filterOptions.dayNights.map((dayNight) => (
             <option key={dayNight} value={dayNight}>
-              {dayNight}
+              {formatFilterOptionLabel(dayNight, "Tanpa Day / Night")}
             </option>
           ))}
         </SelectField>
@@ -171,4 +171,12 @@ function DateField(props: InputHTMLAttributes<HTMLInputElement>) {
       className="h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-sky-500"
     />
   );
+}
+
+function formatFilterOptionLabel(value: string, emptyLabel: string) {
+  if (value === "ALL") {
+    return "All";
+  }
+
+  return value || emptyLabel;
 }

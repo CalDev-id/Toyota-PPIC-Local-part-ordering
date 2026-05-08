@@ -100,7 +100,9 @@ const tableColumns: Array<{
     | "camNo02Delivery"
     | "cr1trRequest"
     | "cr1trDelivery"
-    | "remarks"
+    | "remarksOrdering"
+    | "remarksDelivery"
+    | "remarksReceiving"
     | "actions";
   label: string;
   align?: "left" | "right";
@@ -121,7 +123,9 @@ const tableColumns: Array<{
   { key: "camNo02Delivery", label: "Delivery", align: "right", group: "camNo02" },
   { key: "cr1trRequest", label: "Request", align: "right", group: "cr1tr" },
   { key: "cr1trDelivery", label: "Delivery", align: "right", group: "cr1tr" },
-  { key: "remarks", label: "Remarks", group: "remarks" },
+  { key: "remarksOrdering", label: "Ordering", group: "remarks" },
+  { key: "remarksDelivery", label: "Delivery", group: "remarks" },
+  { key: "remarksReceiving", label: "Receiving", group: "remarks" },
   { key: "actions", label: "Action", group: "actions" },
 ];
 
@@ -835,7 +839,9 @@ function OrderQueueTable({
                   {showDelivery ? <NumericCell value={row.camNo02.delivery} group="camNo02" /> : null}
                   <NumericCell value={getOrderRequestQty(row, "cr1tr")} group="cr1tr" />
                   {showDelivery ? <NumericCell value={row.cr1tr.delivery} group="cr1tr" /> : null}
-                  <RemarksCell row={row} />
+                  <RemarksCell value={row.remarksOrdering} />
+                  <RemarksCell value={row.remarksDelivery} />
+                  <RemarksCell value={row.remarksReceiving} />
                   <td className="border-b border-r border-slate-200 bg-slate-50/70 px-4 py-3 whitespace-nowrap">
                     {row.statusOrder.toLowerCase() === "submitted" ? (
                       <div className="flex gap-2">
@@ -970,25 +976,11 @@ function getOrderRequestQty(row: OrderReportRow, key: OrderItemSummary["key"]) {
   return row.truckType === "GAP" ? row[key].gapRequest ?? 0 : row[key].order;
 }
 
-function RemarksCell({ row }: { row: OrderReportRow }) {
-  const remarks = [
-    { label: "Junbiki S2", value: row.remarksJunbikiS2 },
-    { label: "Pallet S2", value: row.remarksPalletS2 },
-    { label: "Gap S2", value: row.remarksGapS2 },
-  ].filter((item) => item.value && item.value !== "-");
-
+function RemarksCell({ value }: { value: string }) {
   return (
     <td className={`border-b border-r border-slate-200 px-4 py-3 text-left text-slate-700 ${getOrderGroupCellClassName("remarks")}`}>
-      <div className="min-w-[240px] space-y-1 whitespace-pre-wrap break-words">
-        {remarks.length > 0 ? (
-          remarks.map((item) => (
-            <p key={item.label}>
-              <span className="font-semibold text-slate-900">{item.label}:</span> {item.value}
-            </p>
-          ))
-        ) : (
-          "-"
-        )}
+      <div className="min-w-[180px] whitespace-pre-wrap break-words">
+        {value && value !== "-" ? value : "-"}
       </div>
     </td>
   );
@@ -1002,7 +994,7 @@ function buildOrderColumnGroups(showDelivery: boolean) {
     { key: "camNo01", label: "Cam 01", colSpan: showDelivery ? 2 : 1, className: "bg-violet-50 text-violet-900" },
     { key: "camNo02", label: "Cam 02", colSpan: showDelivery ? 2 : 1, className: "bg-rose-50 text-rose-900" },
     { key: "cr1tr", label: "CR 1TR", colSpan: showDelivery ? 2 : 1, className: "bg-amber-50 text-amber-900" },
-    { key: "remarks", label: "Remarks", colSpan: 1, className: "bg-slate-100 text-slate-700" },
+    { key: "remarks", label: "Remarks", colSpan: 3, className: "bg-slate-100 text-slate-700" },
     { key: "actions", label: "Action", colSpan: 1, className: "bg-slate-900 text-white" },
   ];
 }

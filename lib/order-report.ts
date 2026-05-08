@@ -31,9 +31,9 @@ export type OrderReportRow = {
   camNo01: OrderMetricPair;
   camNo02: OrderMetricPair;
   cr1tr: OrderMetricPair;
-  remarksJunbikiS2: string;
-  remarksPalletS2: string;
-  remarksGapS2: string;
+  remarksOrdering: string;
+  remarksDelivery: string;
+  remarksReceiving: string;
   sortDateValue: number;
 };
 
@@ -231,12 +231,15 @@ export async function getOrderReportRows(filter: OrderingFilter): Promise<OrderR
       ritaseRequest: true,
       statusOrder: true,
       remarksOrdering: true,
+      remarksDelivery: true,
       details: {
         select: {
           itemCode: true,
           qtyOrder: true,
           gapRequestQty: true,
           qtyConfirm: true,
+          qtyReceived: true,
+          remarksDelivery: true,
           lineNo: true,
         },
         orderBy: { lineNo: "asc" },
@@ -258,8 +261,17 @@ export async function getOrderReportRows(filter: OrderingFilter): Promise<OrderR
         order: detail.qtyOrder,
         gapRequest: detail.gapRequestQty ?? 0,
         delivery: detail.qtyConfirm ?? 0,
+        received: detail.qtyReceived ?? 0,
       };
     }
+
+    const receivingRemarks = Array.from(
+      new Set(
+        header.details
+          .map((detail) => normalizeText(detail.remarksDelivery))
+          .filter((remark) => remark && remark !== "-")
+      )
+    );
 
     return {
       orderId: header.orderId,
@@ -277,9 +289,9 @@ export async function getOrderReportRows(filter: OrderingFilter): Promise<OrderR
       camNo01: metrics.camNo01,
       camNo02: metrics.camNo02,
       cr1tr: metrics.cr1tr,
-      remarksJunbikiS2: header.truckType === "JUNBIKI" ? normalizeText(header.remarksOrdering) : "-",
-      remarksPalletS2: header.truckType === "PALLET" ? normalizeText(header.remarksOrdering) : "-",
-      remarksGapS2: header.truckType === "GAP" ? normalizeText(header.remarksOrdering) : "-",
+      remarksOrdering: normalizeText(header.remarksOrdering),
+      remarksDelivery: normalizeText(header.remarksDelivery),
+      remarksReceiving: receivingRemarks.length > 0 ? receivingRemarks.join("; ") : "-",
       sortDateValue: header.waktuOrder.getTime(),
     };
   });

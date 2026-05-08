@@ -45,9 +45,6 @@ export default function PlanningPageClient() {
   const [form, setForm] = useState<PlanningFormValues>(() => buildEmptyForm(getTodayInputValue()));
   const [editingId, setEditingId] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
-  const [editingMeta, setEditingMeta] = useState<Pick<PlanningRecord, "planId" | "inputBy" | "inputAt"> | null>(
-    null
-  );
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -157,11 +154,6 @@ export default function PlanningPageClient() {
 
   function handleEdit(record: PlanningRecord) {
     setEditingId(record.planId);
-    setEditingMeta({
-      planId: record.planId,
-      inputBy: record.inputBy,
-      inputAt: record.inputAt,
-    });
     setForm({
       tanggal: record.tanggal,
       shift: record.shift,
@@ -186,7 +178,6 @@ export default function PlanningPageClient() {
 
   function resetForm(nextDate = getTodayInputValue()) {
     setEditingId(null);
-    setEditingMeta(null);
     setForm(buildEmptyForm(nextDate));
   }
 
@@ -366,9 +357,9 @@ export default function PlanningPageClient() {
                     <TableHead label="CR 1TR" className="bg-sky-50/70 text-right" />
                     <TableHead label="Cam 01" className="bg-sky-50/70 text-right" />
                     <TableHead label="Cam 02" className="bg-sky-50/70 text-right" />
-                    <TableHead label="CR 1TR" className="bg-amber-50/70 text-right" />
                     <TableHead label="CB 1TR" className="bg-amber-50/70 text-right" />
                     <TableHead label="CB 2TR" className="bg-amber-50/70 text-right" />
+                    <TableHead label="CR 1TR" className="bg-amber-50/70 text-right" />
                     <TableHead label="Cam 01" className="bg-amber-50/70 text-right" />
                     <TableHead label="Cam 02" className="bg-amber-50/70 text-right" />
                     <TableHead label="Aksi" className="bg-slate-100" />
@@ -387,9 +378,9 @@ export default function PlanningPageClient() {
                       <TableCell value={formatNumber(record.stockAwalEmergencyCr1tr)} className="bg-sky-50/50 text-right tabular-nums" />
                       <TableCell value={formatNumber(record.stockAwalEmergencyCam01)} className="bg-sky-50/50 text-right tabular-nums" />
                       <TableCell value={formatNumber(record.stockAwalEmergencyCam02)} className="bg-sky-50/50 text-right tabular-nums" />
-                      <TableCell value={formatNumber(record.planProdCr1tr)} className="bg-amber-50/50 text-right tabular-nums" />
                       <TableCell value={formatNumber(record.planProdCb1tr)} className="bg-amber-50/50 text-right tabular-nums" />
                       <TableCell value={formatNumber(record.planProdCb2tr)} className="bg-amber-50/50 text-right tabular-nums" />
+                      <TableCell value={formatNumber(record.planProdCr1tr)} className="bg-amber-50/50 text-right tabular-nums" />
                       <TableCell value={formatNumber(record.planProdCam01)} className="bg-amber-50/50 text-right tabular-nums" />
                       <TableCell value={formatNumber(record.planProdCam02)} className="bg-amber-50/50 text-right tabular-nums" />
                       <td className="border-b border-r border-slate-200 bg-slate-50/70 px-4 py-3 whitespace-nowrap">
@@ -495,14 +486,6 @@ export default function PlanningPageClient() {
             </div>
 
             <div className="space-y-5 px-6 py-5">
-              {editingMeta ? (
-                <div className="grid gap-2 rounded-2xl border border-slate-200 bg-slate-50/70 p-4 text-sm text-slate-600 md:grid-cols-3">
-                  <ReadOnlyMeta label="Plan ID" value={editingMeta.planId} />
-                  <ReadOnlyMeta label="Input By" value={editingMeta.inputBy || "-"} />
-                  <ReadOnlyMeta label="Input At" value={formatDateTime(editingMeta.inputAt)} />
-                </div>
-              ) : null}
-
               <form onSubmit={handleSubmit} className="space-y-5">
                 <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_220px]">
                   <div className="grid gap-4 md:grid-cols-2">
@@ -671,14 +654,6 @@ function SelectField({
   );
 }
 
-function ReadOnlyMeta({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <span className="font-medium text-slate-900">{label}:</span> {value}
-    </div>
-  );
-}
-
 function TableHead({
   label,
   className,
@@ -720,22 +695,6 @@ function TableCell({
   className?: string;
 }) {
   return <td className={`border-b border-r border-slate-200 px-4 py-3 text-slate-700 ${className ?? ""}`}>{value}</td>;
-}
-
-function formatDateTime(value: string) {
-  if (!value) {
-    return "-";
-  }
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-
-  return new Intl.DateTimeFormat("id-ID", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(date);
 }
 
 function formatNumber(value: number) {

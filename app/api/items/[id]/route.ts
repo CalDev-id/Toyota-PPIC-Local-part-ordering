@@ -13,7 +13,7 @@ export async function DELETE(
     })
 
     return NextResponse.json({ success: true })
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       { error: 'Data tidak ditemukan' },
       { status: 404 }
