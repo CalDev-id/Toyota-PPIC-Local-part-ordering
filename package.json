@@ -11,7 +11,8 @@
     "db:import-ordering": "tsx scripts/import-ordering-data.ts",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
-    "test:blackbox": "tsx tests/e2e/setup-test-db.ts && playwright test"
+    "test:blackbox": "tsx tests/e2e/setup-test-db.ts && playwright test",
+    "test:perf": "tsx tests/e2e/setup-test-db.ts && playwright test -c playwright.performance.config.ts"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.1",
