@@ -16,8 +16,11 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Toyota Dashboard",
-  description: "Toyota dummy dashboard with collapsible sidebar",
+  title: "Asoi-rdc",
+  description: "Asoi-rdc dashboard",
+  icons: {
+    icon: "/asoi.ico",
+  },
 };
 
 export default async function RootLayout({

@@ -166,12 +166,13 @@ export default function Sidebar({
 }: SidebarProps) {
   const mounted = useMounted();
   const pathname = usePathname();
-  const { data: session } = useSession();
+  const { data: session, status: authStatus } = useSession();
 
   const userRole = mounted ? (session?.user?.role as AppRole | undefined) : undefined;
-  const visibleMenuItems = menuItems.filter(
-    (item) => !item.roles || (userRole && item.roles.includes(userRole))
-  );
+  const visibleMenuItems =
+    mounted && authStatus === "authenticated" && userRole
+      ? menuItems.filter((item) => !item.roles || item.roles.includes(userRole))
+      : [];
 
   return (
     <>

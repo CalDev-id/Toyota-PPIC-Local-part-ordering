@@ -87,7 +87,7 @@ export default function HomeDashboard({ data, errorMessage }: HomeDashboardProps
         ))}
       </section>
 
-      <section className="grid gap-5 xl:grid-cols-[minmax(0,1.6fr)_minmax(320px,0.8fr)]">
+      <section className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1.6fr)_minmax(320px,0.8fr)]">
         <PlanOrderConfirmedReceivedChart data={data.requestVsConfirmedPerItem} />
         <PlanCoverageChart data={data} />
       </section>
@@ -157,13 +157,13 @@ function PlanOrderConfirmedReceivedChart({
   }
 
   return (
-    <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+    <article className="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h2 className="text-lg font-bold text-slate-950">Plan vs Order vs Confirmed vs Received</h2>
           <p className="mt-1 text-sm text-slate-500">Bandingkan target plan, order aktual, qty confirmed, dan received per item.</p>
         </div>
-        <div className="flex flex-wrap gap-x-4 gap-y-2 text-xs font-medium text-slate-600">
+        <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs font-medium text-slate-600 sm:flex sm:flex-wrap">
           <LegendItem color="#94a3b8" label="Plan" />
           <LegendItem color="#0ea5e9" label="Order" />
           <LegendItem color="#10b981" label="Confirmed" />
@@ -171,8 +171,8 @@ function PlanOrderConfirmedReceivedChart({
         </div>
       </div>
 
-      <div className="relative overflow-x-auto" onMouseLeave={() => setTooltip(null)}>
-        <svg viewBox={`0 0 ${width} ${height}`} className="h-[21.5rem] w-full min-w-[820px]">
+      <div className="relative -mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0" onMouseLeave={() => setTooltip(null)}>
+        <svg viewBox={`0 0 ${width} ${height}`} className="h-[18.5rem] w-full min-w-[680px] sm:h-[21.5rem] sm:min-w-[820px]">
           <line x1={chartLeft} y1={chartTop} x2={chartLeft} y2={chartBottom} stroke="#e2e8f0" strokeWidth="2" />
           <line x1={chartLeft} y1={chartBottom} x2={width - chartRight} y2={chartBottom} stroke="#e2e8f0" strokeWidth="2" />
 
@@ -332,12 +332,12 @@ function PlanCoverageChart({ data }: { data: HomeDashboardData }) {
   let offset = 0;
 
   return (
-    <article className="h-full rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+    <article className="h-full min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
       <h2 className="text-lg font-bold text-slate-950">Plan Coverage</h2>
       <p className="mt-1 text-sm text-slate-500">Posisi order, confirmed, dan received terhadap plan hari ini.</p>
 
       <div className="mt-5 flex justify-center">
-        <svg height="210" width="210" viewBox="0 0 210 210" className="shrink-0">
+        <svg viewBox="0 0 210 210" className="h-44 w-44 shrink-0 sm:h-[210px] sm:w-[210px]">
           <g transform="rotate(-90 105 105)">
             <circle
               stroke="#e2e8f0"
@@ -378,7 +378,7 @@ function PlanCoverageChart({ data }: { data: HomeDashboardData }) {
         </svg>
       </div>
 
-      <div className="mt-4 grid gap-2 text-xs font-semibold text-slate-600 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
+      <div className="mt-4 grid grid-cols-1 gap-2 text-xs font-semibold text-slate-600 min-[420px]:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
         {segments.filter((segment) => segment.value > 0 || segment.label !== "Over Plan").map((segment) => (
           <span key={segment.label} className="inline-flex items-center gap-2">
             <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: segment.color }} />

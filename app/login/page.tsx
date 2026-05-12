@@ -6,14 +6,13 @@ import { redirect } from "next/navigation"
 
 type LoginPageProps = {
   searchParams?: Promise<{
-    callbackUrl?: string | string[]
+    callbackUrl?: string
   }>
 }
 
 export default async function LoginPage({ searchParams }: LoginPageProps) {
-  const session = await getServerSession(authOptions)
   const params = await searchParams
-  const callbackUrl = Array.isArray(params?.callbackUrl) ? params?.callbackUrl[0] : params?.callbackUrl
+  const session = await getServerSession(authOptions)
 
   if (session?.user) {
     redirect("/")
@@ -24,8 +23,8 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
       <div className="grid w-full max-w-5xl overflow-hidden rounded-[32px] border border-white/70 bg-white/85 shadow-[0_30px_80px_rgba(15,23,42,0.16)] backdrop-blur xl:grid-cols-[1.1fr_0.9fr]">
         <section className="relative hidden min-h-[560px] xl:block">
           <Image
-            src="/image/toyota2.jpg"
-            alt="Toyota"
+            src="/image/asoi_logo.png"
+            alt="Asoi-rdc"
             fill
             className="object-cover"
             priority
@@ -39,7 +38,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
             <p className="mt-2 text-sm text-slate-600">Gunakan akun yang sudah terdaftar untuk melanjutkan.</p>
 
             <div className="mt-8 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-              <LoginForm callbackUrl={callbackUrl} />
+              <LoginForm callbackUrl={params?.callbackUrl} />
             </div>
           </div>
         </section>

@@ -69,7 +69,7 @@ export default function AnalysisDashboard({
         </div>
       ) : null}
 
-      <div className="grid gap-5 xl:grid-cols-3">
+      <div className="grid min-w-0 gap-5 xl:grid-cols-3">
         <AnalysisColumn
           kpi={getKpi(data.kpis, "planAccuracy")}
           chartTitle="Plan vs Order (Qty)"
@@ -105,7 +105,7 @@ export default function AnalysisDashboard({
           <p className="mt-1 text-sm text-slate-500">Plan, order, confirmed, dan received per item dalam 7 hari ke belakang.</p>
         </div>
 
-        <div className="grid gap-5 lg:grid-cols-2">
+        <div className="grid min-w-0 gap-5 lg:grid-cols-2">
           {data.weeklyItemQuantity.map((item) => (
             <MultiLineChart
               key={item.key}
@@ -138,7 +138,7 @@ function AnalysisColumn({
   chartSeries: Array<LineSeries<AnalysisDashboardData["weeklyQuantity"][number]>>;
 }) {
   return (
-    <div className="space-y-5">
+    <div className="min-w-0 space-y-5">
       <KpiCard kpi={kpi} icon={kpiIconMap[kpi.key]} />
       <MultiLineChart
         title={chartTitle}
@@ -160,13 +160,13 @@ function KpiCard({
   const isPositive = kpi.delta >= 0;
 
   return (
-    <article className="flex min-h-[150px] items-center gap-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-      <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-full bg-sky-50 text-sky-600">
+    <article className="flex min-h-[132px] items-center gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:min-h-[150px] sm:gap-6 sm:p-6">
+      <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-sky-50 text-sky-600 sm:h-24 sm:w-24">
         <KpiIcon icon={icon} />
       </div>
       <div className="min-w-0">
-        <h2 className="text-lg font-bold text-slate-950">{kpi.label}</h2>
-        <p className="mt-2 text-4xl font-bold leading-none text-sky-600 tabular-nums">
+        <h2 className="text-base font-bold text-slate-950 sm:text-lg">{kpi.label}</h2>
+        <p className="mt-2 text-3xl font-bold leading-none text-sky-600 tabular-nums sm:text-4xl">
           {formatPercent(kpi.value)}
         </p>
         <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
@@ -239,16 +239,16 @@ function MultiLineChart<T extends { date: string; label: string }>({
   }
 
   return (
-    <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+    <article className="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
       <h2 className="text-lg font-bold text-slate-950">{title}</h2>
-      <div className="mt-5 flex flex-wrap gap-x-5 gap-y-2 text-xs font-medium text-slate-600">
+      <div className="mt-5 grid grid-cols-2 gap-x-4 gap-y-2 text-xs font-medium text-slate-600 sm:flex sm:flex-wrap sm:gap-x-5">
         {series.map((item) => (
           <LegendItem key={item.key} color={item.color} label={item.label} />
         ))}
       </div>
 
-      <div className="relative mt-5 overflow-x-auto" onMouseLeave={() => setTooltip(null)}>
-        <svg viewBox={`0 0 ${width} ${height}`} className="h-[20rem] w-full min-w-[460px]">
+      <div className="relative -mx-4 mt-5 overflow-x-auto px-4 sm:mx-0 sm:px-0" onMouseLeave={() => setTooltip(null)}>
+        <svg viewBox={`0 0 ${width} ${height}`} className="h-[17.5rem] w-full min-w-[420px] sm:h-[20rem] sm:min-w-[460px]">
           <line x1={chartLeft} y1={chartTop} x2={chartLeft} y2={chartBottom} stroke="#e2e8f0" strokeWidth="2" />
           <line x1={chartLeft} y1={chartBottom} x2={width - chartRight} y2={chartBottom} stroke="#e2e8f0" strokeWidth="2" />
 
@@ -371,7 +371,7 @@ function LegendItem({ color, label }: { color: string; label: string }) {
 
 function KpiIcon({ icon }: { icon: "target" | "clipboard" | "box" }) {
   const commonProps = {
-    className: "h-16 w-16",
+    className: "h-11 w-11 sm:h-16 sm:w-16",
     fill: "none",
     stroke: "currentColor",
     strokeLinecap: "round" as const,
