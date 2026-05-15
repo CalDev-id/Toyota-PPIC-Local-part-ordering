@@ -15,8 +15,6 @@ type ManageOrderPageProps = {
     date?: string;
     shift?: string;
     dayNight?: string;
-    status?: string;
-    truckType?: string;
   }>;
 };
 
@@ -45,9 +43,6 @@ export default async function ManageOrderPage({ searchParams }: ManageOrderPageP
   }
 
   const summaries = await buildOrderItemSummaries(rows, activeFilter);
-  const selectedStatus = normalizeSelectValue(resolvedSearchParams?.status, ["Submitted", "Confirmed", "Checked"]);
-  const selectedTruckType = normalizeSelectValue(resolvedSearchParams?.truckType, ["JUNBIKI", "PALLET", "GAP"]);
-
   return (
     <DefaultLayout>
       <ManageOrderPageClient
@@ -55,19 +50,10 @@ export default async function ManageOrderPage({ searchParams }: ManageOrderPageP
         summaries={summaries}
         selectedFilter={activeFilter}
         filterOptions={filterOptions}
-        selectedStatus={selectedStatus}
-        selectedTruckType={selectedTruckType}
+        selectedStatus="ALL"
+        selectedTruckType="ALL"
         errorMessage={errorMessage}
       />
     </DefaultLayout>
   );
-}
-
-function normalizeSelectValue(value: string | undefined, options: string[]) {
-  if (!value) {
-    return "ALL";
-  }
-
-  const match = options.find((option) => option.toLowerCase() === value.toLowerCase());
-  return match ?? "ALL";
 }

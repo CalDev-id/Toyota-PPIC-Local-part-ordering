@@ -5,8 +5,8 @@ import JunbikiOrderForm from "@/components/ordering/JunbikiOrderForm";
 import { RequestGapForm } from "@/components/ordering/OrderingReport";
 import PalletOrderForm from "@/components/ordering/PalletOrderForm";
 import AutoSubmitReportFilters from "@/components/shared/AutoSubmitReportFilters";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { startTransition, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 
 type ManageOrderPageClientProps = {
   rows: OrderReportRow[];
@@ -81,8 +81,6 @@ type ShellItem = {
   section: ShellSectionKey;
 };
 
-const STATUS_OPTIONS = ["ALL", "Submitted", "Confirmed", "Checked"];
-const TRUCK_TYPE_OPTIONS = ["ALL", "JUNBIKI", "PALLET", "GAP"];
 const SHELL_SECTIONS: Record<ShellSectionKey, ShellItem[]> = {
   CB_1TR: buildShellItems("CB_1TR", 1, 3),
   CB_2TR: buildShellItems("CB_2TR", 4, 12),
@@ -181,10 +179,8 @@ export default function ManageOrderPageClient({
               Fitur khusus admin untuk edit data ordering, delivery, dan receiving dalam satu modal.
             </p>
           </div>
-          <div className="grid gap-3 xl:min-w-[760px] xl:grid-cols-5">
+          <div className="grid gap-3 sm:grid-cols-3 xl:min-w-[560px]">
             <AutoSubmitReportFilters selectedFilter={selectedFilter} filterOptions={filterOptions} className="contents" />
-            <UrlSelectFilter label="Status" paramName="status" value={selectedStatus} options={STATUS_OPTIONS} />
-            <UrlSelectFilter label="Truck Type" paramName="truckType" value={selectedTruckType} options={TRUCK_TYPE_OPTIONS} />
           </div>
         </div>
       </div>
@@ -262,33 +258,36 @@ function ManageOrderEditModal({
   return (
     <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-950/45 px-4 py-6">
       <div className="max-h-[92vh] w-full max-w-[94vw] overflow-y-auto rounded-3xl border border-slate-200 bg-white shadow-2xl">
-        <div className="flex flex-col gap-4 border-b border-slate-200 px-6 py-5 lg:flex-row lg:items-start lg:justify-between">
-          <div>
+        <div className="border-b border-slate-200 px-6 py-5">
+          <div className="flex items-start justify-between gap-4">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-700">Manage Order</p>
-            <h2 className="mt-2 text-2xl font-bold text-slate-900">{row.code}</h2>
-            <p className="mt-1 text-sm text-slate-600">
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-xl border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
+            >
+              Tutup
+            </button>
+          </div>
+
+          <div>
+            <h2 className="-mt-3 text-2xl font-bold text-slate-900">{row.code}</h2>
+          </div>
+
+          <div className="mt-1 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <p className="text-sm text-slate-600">
               {row.date} / Shift {row.shift} / {row.dayNight || "-"} / {row.truckType}
             </p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="self-start rounded-xl border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
-          >
-            Tutup
-          </button>
-        </div>
-
-        <div className="border-b border-slate-200 px-6 pt-4">
-          <div className="flex flex-wrap gap-2">
-            <TabButton active={activeTab === "order"} onClick={() => onActiveTabChange("order")} label="Order" />
-            <TabButton active={activeTab === "delivery"} onClick={() => onActiveTabChange("delivery")} label="Delivery" />
-            <TabButton
-              active={activeTab === "receiving"}
-              disabled={!receivingEnabled}
-              onClick={() => onActiveTabChange("receiving")}
-              label="Receiving"
-            />
+            <div className="flex flex-wrap gap-2">
+              <TabButton active={activeTab === "order"} onClick={() => onActiveTabChange("order")} label="Order" />
+              <TabButton active={activeTab === "delivery"} onClick={() => onActiveTabChange("delivery")} label="Delivery" />
+              <TabButton
+                active={activeTab === "receiving"}
+                disabled={!receivingEnabled}
+                onClick={() => onActiveTabChange("receiving")}
+                label="Receiving"
+              />
+            </div>
           </div>
         </div>
 
@@ -344,7 +343,7 @@ function OrderTabForm({
           remark: editableOrder.remarksOrdering,
           selected_shells: editableOrder.selectedShells,
         }}
-        onCancel={onCancel}
+        hideHeaderTitle
         onSuccess={onSaved}
       />
     );
@@ -371,7 +370,6 @@ function OrderTabForm({
             CB_2TR: editableOrder.items.find((item) => item.itemCode === "CB_2TR")?.qtyOrder ?? 0,
           },
         }}
-        onCancel={onCancel}
         onSuccess={onSaved}
       />
     );
@@ -761,49 +759,6 @@ function ReceivingTabForm({
   );
 }
 
-function UrlSelectFilter({ label, paramName, value, options }: { label: string; paramName: string; value: string; options: string[] }) {
-  const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-
-  function updateValue(nextValue: string) {
-    const params = new URLSearchParams(searchParams.toString());
-    if (nextValue === "ALL") {
-      params.delete(paramName);
-    } else {
-      params.set(paramName, nextValue);
-    }
-
-    startTransition(() => {
-      router.replace(`${pathname}?${params.toString()}`, { scroll: false });
-    });
-  }
-
-  return (
-    <label className="block">
-      <span className="mb-1 block text-sm font-medium text-slate-700">{label}</span>
-      <div className="relative">
-        <select
-          value={value}
-          onChange={(event) => updateValue(event.target.value)}
-          className="h-11 w-full appearance-none rounded-xl border border-slate-300 bg-white px-3 pr-11 text-sm text-slate-700 outline-none transition focus:border-sky-500"
-        >
-          {options.map((option) => (
-            <option key={option} value={option}>
-              {option === "ALL" ? "All" : option}
-            </option>
-          ))}
-        </select>
-        <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-slate-400">
-          <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8">
-            <path d="m5 7.5 5 5 5-5" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </span>
-      </div>
-    </label>
-  );
-}
-
 function ManageOrderTable({
   rows,
   deletingId,
@@ -959,7 +914,7 @@ function TabButton({ active, disabled, label, onClick }: { active: boolean; disa
       type="button"
       disabled={disabled}
       onClick={onClick}
-      className={`rounded-t-xl border px-4 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-45 ${
+      className={`rounded-xl border px-4 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-45 ${
         active ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
       }`}
     >

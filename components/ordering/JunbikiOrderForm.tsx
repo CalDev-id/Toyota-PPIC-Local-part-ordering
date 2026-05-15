@@ -89,6 +89,7 @@ type JunbikiOrderFormProps = {
   initialKodeOrder?: string;
   onCancel?: () => void;
   onSuccess?: (kodeOrder: string) => void;
+  hideHeaderTitle?: boolean;
 };
 
 const SHIFT_OPTIONS: Shift[] = ["RED", "WHITE"];
@@ -138,6 +139,7 @@ export default function JunbikiOrderForm({
   initialKodeOrder,
   onCancel,
   onSuccess,
+  hideHeaderTitle = false,
 }: JunbikiOrderFormProps) {
   const [header, setHeader] = useState<JunbikiOrderHeader>(() => buildInitialHeader(initialValues));
   const [shellStatuses, setShellStatuses] = useState<ShellStatusMap>(() => buildInitialShellStatuses(initialValues));
@@ -393,6 +395,7 @@ export default function JunbikiOrderForm({
           onChange={updateHeader}
           onClose={onCancel}
           isEditing={isEditing}
+          hideTitle={hideHeaderTitle}
         />
 
         <div className="grid gap-5 xl:grid-cols-[minmax(280px,0.75fr)_minmax(0,1.65fr)]">
@@ -460,17 +463,21 @@ function OrderFormHeader({
   onChange,
   onClose,
   isEditing = false,
+  hideTitle = false,
 }: {
   header: JunbikiOrderHeader;
   ritaseProgress: RitaseProgressState;
   onChange: <Key extends keyof JunbikiOrderHeader>(key: Key, value: JunbikiOrderHeader[Key]) => void;
   onClose?: () => void;
   isEditing?: boolean;
+  hideTitle?: boolean;
 }) {
   return (
     <section className="pb-2">
       <div className="flex items-start justify-between gap-4">
-        <h2 className="text-xl font-bold text-slate-900">{isEditing ? "Edit Order Junbiki" : "Order Junbiki"}</h2>
+        {hideTitle ? null : (
+          <h2 className="text-xl font-bold text-slate-900">{isEditing ? "Edit Order Junbiki" : "Order Junbiki"}</h2>
+        )}
         {onClose ? (
           <button
             type="button"
@@ -482,7 +489,11 @@ function OrderFormHeader({
         ) : null}
       </div>
 
-      <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-[minmax(220px,1.4fr)_minmax(150px,1fr)_minmax(150px,1fr)_minmax(150px,1fr)_max-content] xl:items-end">
+      <div
+        className={`grid gap-4 md:grid-cols-2 xl:grid-cols-[minmax(220px,1.4fr)_minmax(150px,1fr)_minmax(150px,1fr)_minmax(150px,1fr)_max-content] xl:items-end ${
+          hideTitle ? "mt-0" : "mt-5"
+        }`}
+      >
         <div>
           <DateField label="Tanggal Order" value={header.tanggal_order} onChange={(value) => onChange("tanggal_order", value)} />
         </div>
