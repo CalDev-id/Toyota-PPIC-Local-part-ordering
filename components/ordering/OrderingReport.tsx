@@ -476,7 +476,7 @@ export default function OrderingReport({
   );
 }
 
-function OrderingModal({
+export function OrderingModal({
   title,
   children,
   onClose,
@@ -519,7 +519,7 @@ function OrderingModal({
   );
 }
 
-function RequestGapForm({
+export function RequestGapForm({
   orderId,
   initialKodeOrder,
   selectedDate,

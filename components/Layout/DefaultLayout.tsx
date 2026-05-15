@@ -211,6 +211,7 @@ function getCurrentPageLabel(pathname: string) {
     ["/ordering/junbiki", "Junbiki Order"],
     ["/ordering/pallet", "Pallet Order"],
     ["/ordering/stock", "Stock"],
+    ["/manage-order", "Manage Order"],
     ["/ordering", "Ordering"],
     ["/analysis", "Analysis"],
     ["/planning", "Planning"],

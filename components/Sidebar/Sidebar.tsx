@@ -82,6 +82,19 @@ const menuItems: MenuItem[] = [
     ),
   },
   {
+    label: "Manage Order",
+    href: "/manage-order",
+    roles: ["ADMIN"],
+    icon: (
+      <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8">
+        <path d="M5 4h14v16H5z" />
+        <path d="M8 8h8M8 12h5" />
+        <path d="m15 17 4-4" />
+        <path d="m16 13 3 3" />
+      </svg>
+    ),
+  },
+  {
     label: "Recap",
     href: "/recap",
     roles: ["ADMIN", "ORDERING"],

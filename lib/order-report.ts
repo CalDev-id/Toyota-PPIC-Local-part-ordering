@@ -26,6 +26,7 @@ export type OrderReportRow = {
   truckType: string;
   ritaseRequest: number;
   statusOrder: string;
+  deliveryNote: string;
   cb1tr: OrderMetricPair;
   cb2tr: OrderMetricPair;
   camNo01: OrderMetricPair;
@@ -34,7 +35,29 @@ export type OrderReportRow = {
   remarksOrdering: string;
   remarksDelivery: string;
   remarksReceiving: string;
+  shellStateCb1tr: OrderShellState[];
+  shellStateCb2tr: OrderShellState[];
+  details: OrderReportDetail[];
   sortDateValue: number;
+};
+
+export type OrderShellState = {
+  code: string;
+  section: "CB_1TR" | "CB_2TR";
+  status: "active" | "blocked";
+  groupNumber: number;
+};
+
+export type OrderReportDetail = {
+  detailId: string;
+  itemCode: string;
+  itemName: string;
+  qtyOrder: number;
+  gapRequestQty: number;
+  qtyConfirm: number;
+  qtyReceived: number;
+  remarksDelivery: string;
+  lineNo: number;
 };
 
 export type OrderItemSummary = {
@@ -230,11 +253,16 @@ export async function getOrderReportRows(filter: OrderingFilter): Promise<OrderR
       truckType: true,
       ritaseRequest: true,
       statusOrder: true,
+      deliveryNote: true,
       remarksOrdering: true,
       remarksDelivery: true,
+      shellStateCb1tr: true,
+      shellStateCb2tr: true,
       details: {
         select: {
+          detailId: true,
           itemCode: true,
+          itemName: true,
           qtyOrder: true,
           gapRequestQty: true,
           qtyConfirm: true,
@@ -284,6 +312,7 @@ export async function getOrderReportRows(filter: OrderingFilter): Promise<OrderR
       truckType: normalizeText(header.truckType),
       ritaseRequest: header.ritaseRequest ?? 0,
       statusOrder: normalizeText(header.statusOrder),
+      deliveryNote: normalizeText(header.deliveryNote),
       cb1tr: metrics.cb1tr,
       cb2tr: metrics.cb2tr,
       camNo01: metrics.camNo01,
@@ -292,6 +321,19 @@ export async function getOrderReportRows(filter: OrderingFilter): Promise<OrderR
       remarksOrdering: normalizeText(header.remarksOrdering),
       remarksDelivery: normalizeText(header.remarksDelivery),
       remarksReceiving: receivingRemarks.length > 0 ? receivingRemarks.join("; ") : "-",
+      shellStateCb1tr: parseShellState(header.shellStateCb1tr, "CB_1TR"),
+      shellStateCb2tr: parseShellState(header.shellStateCb2tr, "CB_2TR"),
+      details: header.details.map((detail) => ({
+        detailId: detail.detailId,
+        itemCode: normalizeText(detail.itemCode),
+        itemName: normalizeText(detail.itemName),
+        qtyOrder: detail.qtyOrder ?? 0,
+        gapRequestQty: detail.gapRequestQty ?? 0,
+        qtyConfirm: detail.qtyConfirm ?? 0,
+        qtyReceived: detail.qtyReceived ?? 0,
+        remarksDelivery: detail.remarksDelivery?.trim() || "",
+        lineNo: detail.lineNo ?? 0,
+      })),
       sortDateValue: header.waktuOrder.getTime(),
     };
   });
@@ -395,6 +437,40 @@ function formatDateLabel(value: Date): string {
   const month = MONTH_NAMES_SHORT[value.getUTCMonth()];
   const year = value.getUTCFullYear();
   return `${day} ${month} ${year}`;
+}
+
+function parseShellState(value: string | null, section: OrderShellState["section"]): OrderShellState[] {
+  if (!value) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(value);
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+
+    return parsed.flatMap((item) => {
+      if (typeof item !== "object" || item === null) {
+        return [];
+      }
+
+      const code = typeof item.code === "string" ? item.code.trim().toUpperCase() : "";
+      const status =
+        typeof item.status === "string" && ["active", "blocked"].includes(item.status.toLowerCase())
+          ? (item.status.toLowerCase() as OrderShellState["status"])
+          : null;
+      const groupNumber = typeof item.groupNumber === "number" ? item.groupNumber : Number(item.groupNumber ?? 0);
+
+      if (!code || !status || !Number.isFinite(groupNumber)) {
+        return [];
+      }
+
+      return [{ code, section, status, groupNumber }];
+    });
+  } catch {
+    return [];
+  }
 }
 
 function sortSimple(values: string[]) {
