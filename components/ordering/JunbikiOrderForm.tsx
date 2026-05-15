@@ -102,11 +102,11 @@ const SECTION_META: Record<
 > = {
   CB_1TR: {
     title: "CB 1TR",
-    accentClassName: "from-emerald-500/20 via-emerald-500/10 to-white",
+    accentClassName: "from-amber-100/75 via-amber-50/45 to-white",
   },
   CB_2TR: {
     title: "CB 2TR",
-    accentClassName: "from-sky-500/20 via-sky-500/10 to-white",
+    accentClassName: "from-sky-100/75 via-sky-50/45 to-white",
   },
 };
 
@@ -618,9 +618,9 @@ function ShellGridSection({
       </div>
 
       <div className="mt-5 flex flex-wrap gap-2 text-xs font-medium">
-        <LegendBadge label="Idle" className="border-slate-200 bg-slate-100 text-slate-600" />
-        <LegendBadge label="Active / OK" className="border-emerald-200 bg-emerald-50 text-emerald-700" />
-        <LegendBadge label="Blocked / Reject" className="border-rose-200 bg-rose-50 text-rose-700" />
+        <LegendBadge label="Idle" className="border-slate-300 bg-slate-200 text-slate-700" />
+        <LegendBadge label="Active / OK" className="border-emerald-300 bg-emerald-100 text-emerald-900" />
+        <LegendBadge label="Blocked / Reject" className="border-rose-300 bg-rose-100 text-rose-900" />
       </div>
     </section>
   );
@@ -941,14 +941,14 @@ function splitRatioIntoQty(ratioCb1tr: number, ratioCb2tr: number) {
 // ini shell junbiki
 function getShellStatusClassName(status: ShellStatus) {
   if (status === "active") {
-    return "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100";
+    return "border-emerald-300 bg-emerald-100 text-emerald-900 hover:bg-emerald-200";
   }
 
   if (status === "blocked") {
-    return "border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100";
+    return "border-rose-300 bg-rose-100 text-rose-900 hover:bg-rose-200";
   }
 
-  return "border-slate-200 bg-slate-100 text-slate-700 hover:bg-slate-200";
+  return "border-slate-300 bg-slate-200 text-slate-800 hover:bg-slate-300";
   // return "border-slate-200 bg-slate-100 text-slate-700 hover:bg-slate-200";
 }
 

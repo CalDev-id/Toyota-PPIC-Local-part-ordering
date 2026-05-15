@@ -20,7 +20,7 @@ type OrderingPageProps = {
 };
 
 export default async function OrderingPage({ searchParams }: OrderingPageProps) {
-  await requireRole(["ADMIN", "ORDERING"]);
+  const session = await requireRole(["ADMIN", "ORDERING"]);
 
   const resolvedSearchParams = searchParams ? await searchParams : undefined;
   const { filter: selectedFilter, options } = await resolveOrderingContext({
@@ -57,6 +57,7 @@ export default async function OrderingPage({ searchParams }: OrderingPageProps) 
           filterOptions={filterOptions}
           errorMessage={errorMessage}
           successMessage={resolvedSearchParams?.success}
+          userRole={session.user.role}
         />
       </div>
     </DefaultLayout>

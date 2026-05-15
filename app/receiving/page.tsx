@@ -19,7 +19,7 @@ type ReceivingPageProps = {
 };
 
 export default async function ReceivingPage({ searchParams }: ReceivingPageProps) {
-  await requireRole(["ADMIN", "RECEIVING"]);
+  const session = await requireRole(["ADMIN", "RECEIVING"]);
 
   const resolvedSearchParams = searchParams ? await searchParams : undefined;
   const { filter: selectedFilter, options } = await resolveOrderingContext({
@@ -58,6 +58,7 @@ export default async function ReceivingPage({ searchParams }: ReceivingPageProps
           selectedFilter={activeFilter}
           filterOptions={filterOptions}
           errorMessage={errorMessage}
+          userRole={session.user.role}
         />
       </div>
     </DefaultLayout>

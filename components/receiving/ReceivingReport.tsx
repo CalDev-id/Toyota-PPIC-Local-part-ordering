@@ -8,6 +8,7 @@ import type {
   ReceivingQueueRow,
   ReceivingSummary,
 } from "@/lib/receiving-report";
+import type { AppRole } from "@/lib/roles";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
@@ -20,6 +21,7 @@ type ReceivingReportProps = {
   selectedFilter: OrderingFilter;
   filterOptions: OrderingFilterOptions;
   errorMessage?: string | null;
+  userRole: AppRole;
 };
 
 export default function ReceivingReport({
@@ -29,6 +31,7 @@ export default function ReceivingReport({
   selectedFilter,
   filterOptions,
   errorMessage,
+  userRole,
 }: ReceivingReportProps) {
   const router = useRouter();
   const [selectedOrder, setSelectedOrder] = useState<ReceivingQueueRow | null>(null);
@@ -50,13 +53,13 @@ export default function ReceivingReport({
 
   function openCheckModal(order: ReceivingQueueRow) {
     setSelectedOrder(order);
-    setReceivedValues(Object.fromEntries(order.items.map((item) => [item.itemCode, String(item.qtyReceived || "")])));
+    setReceivedValues(Object.fromEntries(order.items.map((item) => [item.itemCode, String(item.qtyReceived ?? 0)])));
     setRemarkValues(Object.fromEntries(order.items.map((item) => [item.itemCode, item.remarksDelivery])));
     setCheckModes(
       Object.fromEntries(
         order.items.map((item) => [
           item.itemCode,
-          getReceivingCheckMode(String(item.qtyReceived || ""), item.remarksDelivery, item.qtyConfirm),
+          getReceivingCheckMode(String(item.qtyReceived ?? 0), item.remarksDelivery, item.qtyConfirm),
         ])
       )
     );
@@ -181,7 +184,8 @@ export default function ReceivingReport({
         description={`Order dengan status Confirmed untuk ${formatFilterLabel(selectedFilter)}.`}
         rows={activeOrders}
         showReceived={false}
-        onCheck={openCheckModal}
+        onAction={openCheckModal}
+        getActionLabel={() => "Check"}
       />
 
       <QueueTable
@@ -189,7 +193,10 @@ export default function ReceivingReport({
         description={`Order dengan status Checked untuk ${formatFilterLabel(selectedFilter)}.`}
         rows={finishedOrders}
         showReceived
-        onCheck={undefined}
+        onAction={openCheckModal}
+        getActionLabel={(order) =>
+          order.statusOrder.toLowerCase() === "checked" || userRole === "ADMIN" ? "Edit" : null
+        }
       />
 
       {selectedOrder ? (
@@ -248,14 +255,18 @@ function QueueTable({
   description,
   rows,
   showReceived,
-  onCheck,
+  onAction,
+  getActionLabel,
 }: {
   title: string;
   description: string;
   rows: ReceivingQueueRow[];
   showReceived: boolean;
-  onCheck?: ((order: ReceivingQueueRow) => void) | undefined;
+  onAction?: ((order: ReceivingQueueRow) => void) | undefined;
+  getActionLabel?: ((order: ReceivingQueueRow) => string | null) | undefined;
 }) {
+  const showAction = Boolean(onAction && getActionLabel && rows.some((row) => getActionLabel(row)));
+
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white/95 shadow-sm">
       <div className="border-b border-slate-200 px-5 py-4">
@@ -272,7 +283,7 @@ function QueueTable({
           <table className="min-w-full border-separate border-spacing-0 text-sm">
             <thead className="text-slate-700">
               <tr>
-                {buildReceivingColumnGroups(showReceived, Boolean(onCheck)).map((group) => (
+                {buildReceivingColumnGroups(showReceived, showAction).map((group) => (
                   <th
                     key={group.key}
                     colSpan={group.colSpan}
@@ -320,7 +331,7 @@ function QueueTable({
                 <th className="border-b border-r border-slate-200 bg-slate-50/70 px-4 py-3 text-left font-semibold whitespace-nowrap">
                   Remarks Delivery
                 </th>
-                {onCheck ? (
+                {showAction ? (
                   <th className="border-b border-r border-slate-200 bg-slate-100 px-4 py-3 text-left font-semibold whitespace-nowrap">
                     Action
                   </th>
@@ -358,15 +369,21 @@ function QueueTable({
                       : []),
                   ])}
                   <RemarksCell value={row.remarksDelivery} />
-                  {onCheck ? (
+                  {showAction ? (
                     <td className="border-b border-r border-slate-200 bg-slate-50/70 px-4 py-3 whitespace-nowrap">
-                      <button
-                        type="button"
-                        onClick={() => onCheck(row)}
-                        className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-slate-700"
-                      >
-                        Check
-                      </button>
+                      {getActionLabel?.(row) ? (
+                        <button
+                          type="button"
+                          onClick={() => onAction?.(row)}
+                          className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-slate-700"
+                        >
+                          {getActionLabel(row)}
+                        </button>
+                      ) : (
+                        <span className="rounded-full border border-slate-200 px-2.5 py-1 text-[11px] font-semibold text-slate-500">
+                          Locked
+                        </span>
+                      )}
                     </td>
                   ) : null}
                 </tr>

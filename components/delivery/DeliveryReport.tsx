@@ -8,6 +8,7 @@ import type {
   OrderingFilter,
   OrderingFilterOptions,
 } from "@/lib/delivery-report";
+import type { AppRole } from "@/lib/roles";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
@@ -41,6 +42,7 @@ type DeliveryReportProps = {
   selectedFilter: OrderingFilter;
   filterOptions: OrderingFilterOptions;
   errorMessage?: string | null;
+  userRole: AppRole;
 };
 
 export default function DeliveryReport({
@@ -50,6 +52,7 @@ export default function DeliveryReport({
   selectedFilter,
   filterOptions,
   errorMessage,
+  userRole,
 }: DeliveryReportProps) {
   const router = useRouter();
   const [selectedOrder, setSelectedOrder] = useState<DeliveryQueueRow | null>(null);
@@ -72,10 +75,10 @@ export default function DeliveryReport({
 
   function openConfirmModal(order: DeliveryQueueRow) {
     setSelectedOrder(order);
-    setDeliveryNote("");
-    setRemarksDelivery("");
+    setDeliveryNote(order.deliveryNote === "-" ? "" : order.deliveryNote);
+    setRemarksDelivery(order.remarksDelivery === "-" ? "" : order.remarksDelivery);
     setConfirmValues(
-      Object.fromEntries(order.items.map((item) => [item.itemCode, ""]))
+      Object.fromEntries(order.items.map((item) => [item.itemCode, String(item.qtyConfirm ?? 0)]))
     );
     setShellStatuses(buildInitialShellStatuses(order));
     setFormError("");
@@ -208,7 +211,8 @@ export default function DeliveryReport({
         description={`Order dengan status Submitted untuk ${formatFilterLabel(selectedFilter)}.`}
         rows={activeOrders}
         showDelivery={false}
-        onConfirm={openConfirmModal}
+        onAction={openConfirmModal}
+        getActionLabel={() => "Konfirmasi"}
       />
 
       <QueueTable
@@ -216,7 +220,10 @@ export default function DeliveryReport({
         description={`Order dengan status Confirmed / Checked untuk ${formatFilterLabel(selectedFilter)}.`}
         rows={finishedOrders}
         showDelivery
-        onConfirm={undefined}
+        onAction={openConfirmModal}
+        getActionLabel={(order) =>
+          order.statusOrder.toLowerCase() === "confirmed" || userRole === "ADMIN" ? "Edit" : null
+        }
       />
 
       {selectedOrder ? (
@@ -261,14 +268,18 @@ function QueueTable({
   description,
   rows,
   showDelivery,
-  onConfirm,
+  onAction,
+  getActionLabel,
 }: {
   title: string;
   description: string;
   rows: DeliveryQueueRow[];
   showDelivery: boolean;
-  onConfirm?: ((order: DeliveryQueueRow) => void) | undefined;
+  onAction?: ((order: DeliveryQueueRow) => void) | undefined;
+  getActionLabel?: ((order: DeliveryQueueRow) => string | null) | undefined;
 }) {
+  const showAction = Boolean(onAction && getActionLabel && rows.some((row) => getActionLabel(row)));
+
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white/95 shadow-sm">
       <div className="border-b border-slate-200 px-5 py-4">
@@ -285,7 +296,7 @@ function QueueTable({
           <table className="min-w-full border-separate border-spacing-0 text-sm">
             <thead className="text-slate-700">
               <tr>
-                {buildDeliveryColumnGroups(showDelivery, Boolean(onConfirm)).map((group) => (
+                {buildDeliveryColumnGroups(showDelivery, showAction).map((group) => (
                   <th
                     key={group.key}
                     colSpan={group.colSpan}
@@ -327,7 +338,7 @@ function QueueTable({
                 <th className="border-b border-r border-slate-200 bg-slate-50/70 px-4 py-3 text-left font-semibold whitespace-nowrap">
                   Remarks Ordering
                 </th>
-                {onConfirm ? (
+                {showAction ? (
                   <th className="border-b border-r border-slate-200 bg-slate-100 px-4 py-3 text-left font-semibold whitespace-nowrap">
                     Action
                   </th>
@@ -360,15 +371,21 @@ function QueueTable({
                       : []),
                   ])}
                   <RemarksCell value={row.remarksOrdering} />
-                  {onConfirm ? (
+                  {showAction ? (
                     <td className="border-b border-r border-slate-200 bg-slate-50/70 px-4 py-3 whitespace-nowrap">
-                      <button
-                        type="button"
-                        onClick={() => onConfirm(row)}
-                        className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-slate-700"
-                      >
-                        Konfirmasi
-                      </button>
+                      {getActionLabel?.(row) ? (
+                        <button
+                          type="button"
+                          onClick={() => onAction?.(row)}
+                          className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-slate-700"
+                        >
+                          {getActionLabel(row)}
+                        </button>
+                      ) : (
+                        <span className="rounded-full border border-slate-200 px-2.5 py-1 text-[11px] font-semibold text-slate-500">
+                          Locked
+                        </span>
+                      )}
                     </td>
                   ) : null}
                 </tr>

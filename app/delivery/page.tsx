@@ -19,7 +19,7 @@ type DeliveryPageProps = {
 };
 
 export default async function DeliveryPage({ searchParams }: DeliveryPageProps) {
-  await requireRole(["ADMIN", "DELIVERY"]);
+  const session = await requireRole(["ADMIN", "DELIVERY"]);
 
   const resolvedSearchParams = searchParams ? await searchParams : undefined;
   const { filter: selectedFilter, options } = await resolveOrderingContext({
@@ -59,6 +59,7 @@ export default async function DeliveryPage({ searchParams }: DeliveryPageProps) 
           selectedFilter={activeFilter}
           filterOptions={filterOptions}
           errorMessage={errorMessage}
+          userRole={session.user.role}
         />
       </div>
     </DefaultLayout>

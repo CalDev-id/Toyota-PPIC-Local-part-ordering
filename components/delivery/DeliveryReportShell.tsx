@@ -6,6 +6,7 @@ import type {
   OrderingFilter,
   OrderingFilterOptions,
 } from "@/lib/delivery-report";
+import type { AppRole } from "@/lib/roles";
 import dynamic from "next/dynamic";
 
 type DeliveryReportShellProps = {
@@ -15,6 +16,7 @@ type DeliveryReportShellProps = {
   selectedFilter: OrderingFilter;
   filterOptions: OrderingFilterOptions;
   errorMessage?: string | null;
+  userRole: AppRole;
 };
 
 const DeliveryReport = dynamic(() => import("@/components/delivery/DeliveryReport"), {

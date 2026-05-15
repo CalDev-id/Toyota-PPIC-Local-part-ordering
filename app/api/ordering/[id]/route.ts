@@ -98,7 +98,7 @@ export async function GET(_: Request, context: RouteContext) {
       return NextResponse.json({ error: "Order tidak ditemukan" }, { status: 404 });
     }
 
-    if (normalizeStatus(order.statusOrder) !== "submitted") {
+    if (session.user.role !== "ADMIN" && normalizeStatus(order.statusOrder) !== "submitted") {
       return NextResponse.json({ error: "Hanya order Submitted yang bisa diedit" }, { status: 409 });
     }
 
@@ -135,7 +135,7 @@ export async function PUT(req: Request, context: RouteContext) {
       return NextResponse.json({ error: "Order tidak ditemukan" }, { status: 404 });
     }
 
-    if (normalizeStatus(order.statusOrder) !== "submitted") {
+    if (session.user.role !== "ADMIN" && normalizeStatus(order.statusOrder) !== "submitted") {
       return NextResponse.json({ error: "Hanya order Submitted yang bisa diedit" }, { status: 409 });
     }
 

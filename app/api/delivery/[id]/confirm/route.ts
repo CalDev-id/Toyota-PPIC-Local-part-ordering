@@ -60,6 +60,12 @@ export async function PUT(req: Request, context: RouteContext) {
       return NextResponse.json({ error: "Order tidak ditemukan" }, { status: 404 });
     }
 
+    const previousStatus = normalizeStatus(order.statusOrder);
+
+    if (session.user.role !== "ADMIN" && previousStatus === "checked") {
+      return NextResponse.json({ error: "Order yang sudah Checked hanya bisa diedit Admin" }, { status: 409 });
+    }
+
     const detailIdsByCode = new Map(order.details.map((detail) => [detail.itemCode, detail.detailId]));
     const invalidItem = items.find((item) => !detailIdsByCode.has(item.itemCode));
 
@@ -76,7 +82,7 @@ export async function PUT(req: Request, context: RouteContext) {
       prisma.orderHeader.update({
         where: { orderId: id },
         data: {
-          statusOrder: "Confirmed",
+          statusOrder: previousStatus === "checked" ? "Checked" : "Confirmed",
           deliveryNote,
           remarksDelivery,
           shellStateCb1tr: order.truckType === "JUNBIKI" ? JSON.stringify(cb1trShells) : order.shellStateCb1tr,
@@ -96,14 +102,16 @@ export async function PUT(req: Request, context: RouteContext) {
       ),
     ]);
 
-    await createRoleNotification({
-      type: "DELIVERY_CONFIRMED",
-      title: "Delivery dikonfirmasi",
-      message: `Order ${order.kodeOrder} sudah dikonfirmasi Delivery`,
-      kodeOrder: order.kodeOrder,
-      orderId: order.orderId,
-      targetRole: "RECEIVING",
-    });
+    if (previousStatus !== "confirmed" && previousStatus !== "checked") {
+      await createRoleNotification({
+        type: "DELIVERY_CONFIRMED",
+        title: "Delivery dikonfirmasi",
+        message: `Order ${order.kodeOrder} sudah dikonfirmasi Delivery`,
+        kodeOrder: order.kodeOrder,
+        orderId: order.orderId,
+        targetRole: "RECEIVING",
+      });
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {
@@ -115,6 +123,10 @@ export async function PUT(req: Request, context: RouteContext) {
 
     return NextResponse.json({ error: "Gagal mengonfirmasi delivery order" }, { status: 500 });
   }
+}
+
+function normalizeStatus(value: string | null | undefined) {
+  return value?.trim().toLowerCase() || "";
 }
 
 function normalizeRequiredText(value: unknown, errorMessage: string) {

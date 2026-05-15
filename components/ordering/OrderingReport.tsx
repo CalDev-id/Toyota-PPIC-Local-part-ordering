@@ -6,6 +6,7 @@ import type {
   OrderingFilterOptions,
   OrderReportRow,
 } from "@/lib/order-report";
+import type { AppRole } from "@/lib/roles";
 import JunbikiOrderForm from "@/components/ordering/JunbikiOrderForm";
 import PalletOrderForm from "@/components/ordering/PalletOrderForm";
 import AutoSubmitReportFilters from "@/components/shared/AutoSubmitReportFilters";
@@ -18,6 +19,7 @@ type OrderingReportProps = {
   selectedFilter: OrderingFilter;
   filterOptions: OrderingFilterOptions;
   errorMessage?: string | null;
+  userRole: AppRole;
 };
 
 type ToastState = {
@@ -135,6 +137,7 @@ export default function OrderingReport({
   selectedFilter,
   filterOptions,
   errorMessage,
+  userRole,
 }: OrderingReportProps) {
   const router = useRouter();
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -288,6 +291,7 @@ export default function OrderingReport({
         onEdit={handleEdit}
         loadingEditId={loadingEditId}
         showDelivery={false}
+        userRole={userRole}
       />
 
       <OrderQueueTable
@@ -300,6 +304,7 @@ export default function OrderingReport({
         onEdit={handleEdit}
         loadingEditId={loadingEditId}
         showDelivery
+        userRole={userRole}
       />
 
       <OrderQueueTable
@@ -312,6 +317,7 @@ export default function OrderingReport({
         onEdit={handleEdit}
         loadingEditId={loadingEditId}
         showDelivery
+        userRole={userRole}
       />
 
       {toast ? (
@@ -769,6 +775,7 @@ function OrderQueueTable({
   onEdit,
   loadingEditId,
   showDelivery,
+  userRole,
 }: {
   title: string;
   description: string;
@@ -779,6 +786,7 @@ function OrderQueueTable({
   onEdit: (row: OrderReportRow) => void;
   loadingEditId: string | null;
   showDelivery: boolean;
+  userRole: AppRole;
 }) {
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white/95 shadow-sm">
@@ -843,26 +851,26 @@ function OrderQueueTable({
                   <RemarksCell value={row.remarksDelivery} />
                   <RemarksCell value={row.remarksReceiving} />
                   <td className="border-b border-r border-slate-200 bg-slate-50/70 px-4 py-3 whitespace-nowrap">
-                    {row.statusOrder.toLowerCase() === "submitted" ? (
+                    {userRole === "ADMIN" || row.statusOrder.toLowerCase() === "submitted" ? (
                       <div className="flex gap-2">
-                        {row.truckType === "GAP" ? null : (
-                          <button
-                            type="button"
-                            onClick={() => onEdit(row)}
-                            disabled={loadingEditId === row.orderId || deletingId === row.orderId}
-                            className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
-                          >
-                            {loadingEditId === row.orderId ? "Membuka..." : "Edit"}
-                          </button>
-                        )}
                         <button
                           type="button"
-                          onClick={() => onRequestDelete(row)}
-                          disabled={deletingId === row.orderId}
-                          className="rounded-lg border border-rose-200 px-3 py-1.5 text-xs font-semibold text-rose-700 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
+                          onClick={() => onEdit(row)}
+                          disabled={loadingEditId === row.orderId || deletingId === row.orderId}
+                          className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
                         >
-                          {deletingId === row.orderId || pendingDeleteId === row.orderId ? "Delete" : "Delete"}
+                          {loadingEditId === row.orderId ? "Membuka..." : "Edit"}
                         </button>
+                        {row.statusOrder.toLowerCase() === "submitted" ? (
+                          <button
+                            type="button"
+                            onClick={() => onRequestDelete(row)}
+                            disabled={deletingId === row.orderId}
+                            className="rounded-lg border border-rose-200 px-3 py-1.5 text-xs font-semibold text-rose-700 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            {deletingId === row.orderId || pendingDeleteId === row.orderId ? "Delete" : "Delete"}
+                          </button>
+                        ) : null}
                       </div>
                     ) : (
                       <span className="rounded-full border border-slate-200 px-2.5 py-1 text-[11px] font-semibold text-slate-500">
