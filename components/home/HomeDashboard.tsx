@@ -297,100 +297,90 @@ function PlanOrderConfirmedReceivedChart({
 }
 
 function PlanCoverageChart({ data }: { data: HomeDashboardData }) {
-  const planQty = data.totals.planQty;
-  const coverageTotal = Math.max(
-    data.totals.planQty,
-    data.totals.orderQty,
-    data.totals.confirmedQty,
-    data.totals.receivedQty
-  );
-  const receivedQty = Math.min(data.totals.receivedQty, data.totals.planQty);
-  const confirmedNotReceivedQty = Math.max(
-    Math.min(data.totals.confirmedQty, data.totals.planQty) - receivedQty,
-    0
-  );
-  const orderNotConfirmedQty = Math.max(
-    Math.min(data.totals.orderQty, data.totals.planQty) - receivedQty - confirmedNotReceivedQty,
-    0
-  );
-  const planNotOrderedQty = Math.max(
-    data.totals.planQty - receivedQty - confirmedNotReceivedQty - orderNotConfirmedQty,
-    0
-  );
-  const overPlanQty = Math.max(coverageTotal - planQty, 0);
-  const segments = [
-    { label: "Received", value: receivedQty, color: "#64748b" },
-    { label: "Confirmed", value: confirmedNotReceivedQty, color: "#10b981" },
-    { label: "Ordered", value: orderNotConfirmedQty, color: "#f59e0b" },
-    { label: "Remaining Plan", value: planNotOrderedQty, color: "#0ea5e9" },
-    { label: "Over Plan", value: overPlanQty, color: "#e11d48" },
-  ];
-  const radius = 72;
-  const stroke = 26;
-  const normalizedRadius = radius - stroke / 2;
-  const circumference = normalizedRadius * 2 * Math.PI;
-  let offset = 0;
+  const orderQty = data.totals.orderQty;
+  const deliveryQty = data.totals.confirmedQty;
+  const maxQty = Math.max(orderQty, deliveryQty, 1);
+  const progress = orderQty > 0 ? Math.min((deliveryQty / orderQty) * 100, 100) : 0;
+  const progressLabel = `${Math.round(progress)}%`;
+  const orderRadius = 62;
+  const deliveryRadius = 86;
+  const ringStroke = 18;
+  const orderCircumference = orderRadius * 2 * Math.PI;
+  const deliveryCircumference = deliveryRadius * 2 * Math.PI;
+  const orderLength = (orderQty / maxQty) * orderCircumference;
+  const deliveryLength = (deliveryQty / maxQty) * deliveryCircumference;
 
   return (
-    <article className="h-full min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-      <h2 className="text-lg font-bold text-slate-950">Plan Coverage</h2>
-      <p className="mt-1 text-sm text-slate-500">Posisi order, confirmed, dan received terhadap plan hari ini.</p>
+    <article className="h-full min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="flex items-start justify-between">
+        <div>
+          <h2 className="text-lg font-semibold text-slate-950">Plan Coverage</h2>
+          <p className="mt-1 text-sm text-slate-500">Delivery completed from order quantity</p>
+        </div>
+        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">
+          {orderQty > 0 ? `${Math.round((deliveryQty / orderQty) * 100)}%` : "0%"}
+        </span>
+      </div>
 
-      <div className="mt-5 flex justify-center">
-        <svg viewBox="0 0 210 210" className="h-44 w-44 shrink-0 sm:h-[210px] sm:w-[210px]">
-          <g transform="rotate(-90 105 105)">
+      <div className="mt-8 flex justify-center">
+        <svg viewBox="0 0 216 216" className="h-52 w-52 shrink-0">
+          <g transform="rotate(-90 108 108)">
             <circle
-              stroke="#e2e8f0"
+              stroke="#f3f4f6"
               fill="transparent"
-              strokeWidth={stroke}
-              r={normalizedRadius}
-              cx="105"
-              cy="105"
+              strokeWidth={ringStroke}
+              r={deliveryRadius}
+              cx="108"
+              cy="108"
             />
-            {coverageTotal > 0
-              ? segments.map((segment) => {
-                  const length = (segment.value / coverageTotal) * circumference;
-                  const dashOffset = -offset;
-                  offset += length;
-
-                  return (
-                    <circle
-                      key={segment.label}
-                      stroke={segment.color}
-                      fill="transparent"
-                      strokeWidth={stroke}
-                      strokeDasharray={`${length} ${circumference - length}`}
-                      strokeDashoffset={dashOffset}
-                      r={normalizedRadius}
-                      cx="105"
-                      cy="105"
-                    />
-                  );
-                })
-              : null}
+            <circle
+              stroke="#9ca3af"
+              fill="transparent"
+              strokeLinecap="round"
+              strokeWidth={ringStroke}
+              strokeDasharray={`${deliveryLength} ${deliveryCircumference - deliveryLength}`}
+              r={deliveryRadius}
+              cx="108"
+              cy="108"
+            />
+            <circle
+              stroke="#e0f2fe"
+              fill="transparent"
+              strokeWidth={ringStroke}
+              r={orderRadius}
+              cx="108"
+              cy="108"
+            />
+            <circle
+              stroke="#0ea5e9"
+              fill="transparent"
+              strokeLinecap="round"
+              strokeWidth={ringStroke}
+              strokeDasharray={`${orderLength} ${orderCircumference - orderLength}`}
+              r={orderRadius}
+              cx="108"
+              cy="108"
+            />
           </g>
-          <text x="105" y="99" textAnchor="middle" className="fill-slate-950 text-2xl font-bold">
-            {formatQuantity(planQty)}
+          <text x="108" y="104" textAnchor="middle" className="fill-slate-950 text-[30px] font-semibold">
+            {progressLabel}
           </text>
-          <text x="105" y="122" textAnchor="middle" className="fill-slate-500 text-[12px] font-medium">
-            Plan Qty
+          <text x="108" y="126" textAnchor="middle" className="fill-slate-500 text-xs font-medium">
+            Progress
           </text>
         </svg>
       </div>
 
-      <div className="mt-4 grid grid-cols-1 gap-2 text-xs font-semibold text-slate-600 min-[420px]:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
-        {segments.filter((segment) => segment.value > 0 || segment.label !== "Over Plan").map((segment) => (
-          <span key={segment.label} className="inline-flex items-center gap-2">
-            <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: segment.color }} />
-            <span>{segment.label}</span>
-          </span>
-        ))}
+      <div className="mt-8 grid grid-cols-2 divide-x divide-slate-200 rounded-2xl bg-slate-50 p-4 text-center">
+        <div className="px-2">
+          <p className="text-sm font-semibold text-slate-500">Order Qty</p>
+          <p className="mt-1 text-base font-bold text-slate-950 tabular-nums">{formatQuantity(orderQty)}</p>
+        </div>
+        <div className="px-2">
+          <p className="text-sm font-semibold text-slate-500">Delivery Qty</p>
+          <p className="mt-1 text-base font-bold text-slate-950 tabular-nums">{formatQuantity(deliveryQty)}</p>
+        </div>
       </div>
-      {overPlanQty > 0 ? (
-        <p className="mt-3 rounded-xl border border-rose-100 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700">
-          Aktual melebihi plan sebesar {formatQuantity(overPlanQty)} qty.
-        </p>
-      ) : null}
     </article>
   );
 }
