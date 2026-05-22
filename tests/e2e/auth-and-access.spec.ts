@@ -24,20 +24,27 @@ test("does not follow external callback URLs after login", async ({ page }) => {
 
 test("shows admin navigation", async ({ page }) => {
   await login(page, "admin");
+  const sidebar = page.locator("aside");
   await expectMenu(
     page,
     ["Home", "Analysis", "Planning", "Ordering", "Recap", "Stock", "Delivery", "Receiving", "Tracking", "Users"],
     []
   );
+  await expect(sidebar.getByText("Overview", { exact: true })).toBeVisible();
+  await expect(sidebar.getByText("Fulfillment", { exact: true })).toBeVisible();
+  await expect(sidebar.getByText("Admin", { exact: true })).toBeVisible();
 });
 
 test("shows ordering navigation and hides restricted menus", async ({ page }) => {
   await login(page, "ordering");
+  const sidebar = page.locator("aside");
   await expectMenu(
     page,
     ["Home", "Analysis", "Planning", "Ordering", "Recap", "Stock", "Tracking"],
     ["Delivery", "Receiving", "Users"]
   );
+  await expect(sidebar.getByText("Overview", { exact: true })).toHaveCount(0);
+  await expect(sidebar.getByText("Fulfillment", { exact: true })).toHaveCount(0);
 });
 
 test("enforces role guard for restricted pages", async ({ page }) => {

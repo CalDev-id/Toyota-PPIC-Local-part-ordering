@@ -21,6 +21,18 @@ type MenuItem = {
   roles?: AppRole[];
 };
 
+type AdminMenuGroup = {
+  label: string;
+  items: string[];
+};
+
+const adminMenuGroups: AdminMenuGroup[] = [
+  { label: "Overview", items: ["Home", "Analysis", "Tracking"] },
+  { label: "Ordering", items: ["Planning", "Ordering", "Recap", "Stock"] },
+  { label: "Fulfillment", items: ["Delivery", "Receiving"] },
+  { label: "Admin", items: ["Manage Order", "Users"] },
+];
+
 const menuItems: MenuItem[] = [
   {
     label: "Home",
@@ -186,6 +198,37 @@ export default function Sidebar({
     mounted && authStatus === "authenticated" && userRole
       ? menuItems.filter((item) => !item.roles || item.roles.includes(userRole))
       : [];
+  const adminMenuSections = adminMenuGroups
+    .map((group) => ({
+      ...group,
+      items: group.items
+        .map((label) => visibleMenuItems.find((item) => item.label === label))
+        .filter((item): item is MenuItem => Boolean(item)),
+    }))
+    .filter((group) => group.items.length > 0);
+  const showAdminGroups = userRole === "ADMIN";
+
+  function renderMenuItem(item: MenuItem) {
+    const isActive = pathname === item.href;
+
+    return (
+      <Link
+        key={item.href}
+        href={item.href}
+        onClick={onCloseMobile}
+        className={`group flex items-center gap-3 rounded-xl px-3 py-3 transition ${
+          isActive
+            ? "bg-[#d9fcf3] text-slate-500"
+            : "text-slate-500 hover:bg-black/5 hover:text-slate-500"
+        } ${collapsed ? "md:justify-center" : ""}`}
+      >
+        <span className={isActive ? "text-slate-500" : "text-slate-400 group-hover:text-slate-500"}>
+          {item.icon}
+        </span>
+        <span className={`text-md font-medium ${collapsed ? "md:hidden" : ""}`}>{item.label}</span>
+      </Link>
+    );
+  }
 
   return (
     <>
@@ -243,26 +286,16 @@ export default function Sidebar({
 
           {/* MENU ITEMS */}
           <nav className="flex-1 space-y-2 p-3">
-            {visibleMenuItems.map((item) => {
-              const isActive = pathname === item.href;
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  onClick={onCloseMobile}
-                  className={`group flex items-center gap-3 rounded-xl px-3 py-3 transition ${
-                    isActive
-                      ? "bg-[#d9fcf3] text-slate-500"
-                      : "text-slate-500 hover:bg-black/5 hover:text-slate-500"
-                  } ${collapsed ? "md:justify-center" : ""}`}
-                >
-                  <span className={isActive ? "text-slate-500" : "text-slate-400 group-hover:text-slate-500"}>
-                    {item.icon}
-                  </span>
-                  <span className={`text-md font-medium ${collapsed ? "md:hidden" : ""}`}>{item.label}</span>
-                </Link>
-              );
-            })}
+            {showAdminGroups
+              ? adminMenuSections.map((group) => (
+                  <div key={group.label} className="space-y-1.5">
+                    <p className={`px-3 pt-2 text-xs font-semibold uppercase tracking-wide text-slate-400 ${collapsed ? "md:hidden" : ""}`}>
+                      {group.label}
+                    </p>
+                    <div className="space-y-1">{group.items.map(renderMenuItem)}</div>
+                  </div>
+                ))
+              : visibleMenuItems.map(renderMenuItem)}
           </nav>
 
           <div className={`border-t border-white/10 p-4 text-xs text-slate-400 ${collapsed ? "md:text-center" : ""}`}>
