@@ -37,7 +37,7 @@ const stockItems: StockItem[] = [
   },
   {
     name: "Crankshaft",
-    image: "/image/cr.png",
+    image: "/image/crank.png",
     qty: 44,
     variants: [
       { variant: "1TR", min: 32, max: 78, actual: 44 },
