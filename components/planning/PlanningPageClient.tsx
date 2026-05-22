@@ -1,6 +1,7 @@
 "use client";
 
 import { getDefaultDayNightByTime } from "@/lib/day-night";
+import Image from "next/image";
 import type { FormEvent } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -219,29 +220,47 @@ export default function PlanningPageClient() {
   const latestRecord = filteredSummaryRecords[0] ?? null;
   const summaryCards = [
     {
-      label: "CB 1TR",
-      stock: latestRecord ? latestRecord.stockAwalJunbikiCb1tr + latestRecord.stockAwalEmergencyCb1tr : 0,
-      plan: latestRecord?.planProdCb1tr ?? 0,
+      name: "Cylinder Block",
+      image: "/image/cb.png",
+      variants: [
+        {
+          label: "1TR",
+          stock: latestRecord ? latestRecord.stockAwalJunbikiCb1tr + latestRecord.stockAwalEmergencyCb1tr : 0,
+          plan: latestRecord?.planProdCb1tr ?? 0,
+        },
+        {
+          label: "2TR",
+          stock: latestRecord ? latestRecord.stockAwalJunbikiCb2tr + latestRecord.stockAwalEmergencyCb2tr : 0,
+          plan: latestRecord?.planProdCb2tr ?? 0,
+        },
+      ],
     },
     {
-      label: "CB 2TR",
-      stock: latestRecord ? latestRecord.stockAwalJunbikiCb2tr + latestRecord.stockAwalEmergencyCb2tr : 0,
-      plan: latestRecord?.planProdCb2tr ?? 0,
+      name: "Camshaft",
+      image: "/image/cam.png",
+      variants: [
+        {
+          label: "1TR",
+          stock: latestRecord?.stockAwalEmergencyCam01 ?? 0,
+          plan: latestRecord?.planProdCam01 ?? 0,
+        },
+        {
+          label: "2TR",
+          stock: latestRecord?.stockAwalEmergencyCam02 ?? 0,
+          plan: latestRecord?.planProdCam02 ?? 0,
+        },
+      ],
     },
     {
-      label: "CR 1TR",
-      stock: latestRecord?.stockAwalEmergencyCr1tr ?? 0,
-      plan: latestRecord?.planProdCr1tr ?? 0,
-    },
-    {
-      label: "Cam 01",
-      stock: latestRecord?.stockAwalEmergencyCam01 ?? 0,
-      plan: latestRecord?.planProdCam01 ?? 0,
-    },
-    {
-      label: "Cam 02",
-      stock: latestRecord?.stockAwalEmergencyCam02 ?? 0,
-      plan: latestRecord?.planProdCam02 ?? 0,
+      name: "Crankshaft",
+      image: "/image/crank.png",
+      variants: [
+        {
+          label: "1TR",
+          stock: latestRecord?.stockAwalEmergencyCr1tr ?? 0,
+          plan: latestRecord?.planProdCr1tr ?? 0,
+        },
+      ],
     },
   ];
 
@@ -307,21 +326,66 @@ export default function PlanningPageClient() {
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+      <div className="grid gap-5 lg:grid-cols-2 2xl:grid-cols-3">
         {summaryCards.map((item) => (
           <article
-            key={item.label}
-            className="rounded-2xl border border-slate-200 bg-white/95 p-5 shadow-sm"
+            key={item.name}
+            className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
           >
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{item.label}</p>
-            <div className="mt-4 space-y-3">
-              <MetricRow label="Stock Awal" value={item.stock} />
-              <MetricRow label="Plan" value={item.plan} />
-              <MetricRow
-                label="Plan Order"
-                value={Math.max(item.plan - item.stock, 0)}
-                valueClassName="text-emerald-600"
-              />
+            <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
+              <div className="flex h-32 w-full shrink-0 items-center justify-center rounded-2xl border border-slate-100 bg-slate-50 p-4 sm:w-36">
+                <Image
+                  src={item.image}
+                  alt={item.name}
+                  width={220}
+                  height={160}
+                  className="max-h-24 w-auto object-contain mix-blend-multiply"
+                  priority={item.name === "Cylinder Block"}
+                />
+              </div>
+
+              <div className="min-w-0 flex-1">
+                <h2 className="mt-2 text-xl font-bold leading-tight text-slate-950">{item.name}</h2>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {item.variants.map((variant) => (
+                    <span
+                      key={variant.label}
+                      className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-bold text-slate-600"
+                    >
+                      {variant.label}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-5 overflow-x-auto">
+              <div className="min-w-[24rem] overflow-hidden rounded-2xl border border-slate-200">
+                <table className="w-full table-fixed text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-200 bg-slate-50 text-slate-600">
+                      <th className="w-32 px-4 py-3 text-left text-xs font-bold uppercase tracking-[0.14em]">Variant</th>
+                      {item.variants.map((variant) => (
+                        <th key={variant.label} className="px-4 py-3 text-center text-sm font-bold text-slate-950">
+                          {variant.label}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    <PlanningMetricTableRow label="Stock Awal" variants={item.variants} valueKey="stock" />
+                    <PlanningMetricTableRow label="Plan" variants={item.variants} valueKey="plan" />
+                    <tr>
+                      <th className="px-4 py-3 text-left font-semibold text-slate-500">Plan Order</th>
+                      {item.variants.map((variant) => (
+                        <td key={variant.label} className="px-4 py-3 text-center font-bold text-emerald-600 tabular-nums">
+                          {formatNumber(Math.max(variant.plan - variant.stock, 0))}
+                        </td>
+                      ))}
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
             </div>
           </article>
         ))}
@@ -739,19 +803,23 @@ function buildEmptyForm(tanggal = getTodayInputValue()): PlanningFormValues {
   };
 }
 
-function MetricRow({
+function PlanningMetricTableRow({
   label,
-  value,
-  valueClassName,
+  variants,
+  valueKey,
 }: {
   label: string;
-  value: number;
-  valueClassName?: string;
+  variants: Array<{ label: string; stock: number; plan: number }>;
+  valueKey: "stock" | "plan";
 }) {
   return (
-    <div className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-3">
-      <p className="text-sm font-medium text-slate-600">{label}</p>
-      <p className={`text-lg font-bold text-slate-900 ${valueClassName ?? ""}`}>{formatNumber(value)}</p>
-    </div>
+    <tr>
+      <th className="px-4 py-3 text-left font-semibold text-slate-500">{label}</th>
+      {variants.map((variant) => (
+        <td key={variant.label} className="px-4 py-3 text-center font-semibold text-slate-900 tabular-nums">
+          {formatNumber(variant[valueKey])}
+        </td>
+      ))}
+    </tr>
   );
 }
