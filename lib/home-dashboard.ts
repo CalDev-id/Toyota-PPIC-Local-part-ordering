@@ -98,6 +98,7 @@ function mapAnalysisToHomeDashboard(
   };
   const pendingConfirmQty = Math.max(activeTotals.orderQty - activeTotals.confirmedQty, 0);
   const pendingReceiveQty = Math.max(activeTotals.confirmedQty - activeTotals.receivedQty, 0);
+  const deliveryGapQty = Math.max(activeTotals.orderQty - activeTotals.confirmedQty, 0);
 
   return {
     filter,
@@ -133,10 +134,10 @@ function mapAnalysisToHomeDashboard(
       },
       {
         key: "pending",
-        label: "Pending Qty",
-        value: pendingConfirmQty + pendingReceiveQty,
-        helper: "Belum selesai flow",
-        tone: "rose",
+        label: "Gap Qty",
+        value: deliveryGapQty,
+        helper: "Selisih order dan delivery",
+        tone: deliveryGapQty > 0 ? "rose" : "emerald",
       },
     ],
     accuracy: [

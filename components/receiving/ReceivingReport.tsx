@@ -42,6 +42,7 @@ export default function ReceivingReport({
   const [formError, setFormError] = useState("");
   const [toastMessage, setToastMessage] = useState("");
   const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const orderRows = [...activeOrders, ...finishedOrders];
 
   useEffect(() => {
     return () => {
@@ -180,23 +181,12 @@ export default function ReceivingReport({
       </div>
 
       <QueueTable
-        title="Active Receiving"
-        description={`Order dengan status Confirmed untuk ${formatFilterLabel(selectedFilter)}.`}
-        rows={activeOrders}
-        showReceived={false}
-        onAction={openCheckModal}
-        getActionLabel={() => "Check"}
-      />
-
-      <QueueTable
-        title="Finish Receiving"
-        description={`Order dengan status Checked untuk ${formatFilterLabel(selectedFilter)}.`}
-        rows={finishedOrders}
+        title="Order List"
+        description={`Daftar order untuk ${formatFilterLabel(selectedFilter)}.`}
+        rows={orderRows}
         showReceived
         onAction={openCheckModal}
-        getActionLabel={(order) =>
-          order.statusOrder.toLowerCase() === "checked" || userRole === "ADMIN" ? "Edit" : null
-        }
+        getActionLabel={(order) => getReceivingActionLabel(order, userRole)}
       />
 
       {selectedOrder ? (
@@ -276,7 +266,7 @@ function QueueTable({
 
       {rows.length === 0 ? (
         <div className="px-5 py-10 text-center text-sm text-slate-500">
-          Tidak ada data yang bisa ditampilkan pada section ini.
+          Tidak ada order pada filter ini.
         </div>
       ) : (
         <div className="overflow-x-auto">
@@ -304,6 +294,9 @@ function QueueTable({
                     {column.label}
                   </th>
                 ))}
+                <th className="border-b border-r border-slate-200 bg-white px-4 py-3 text-left font-semibold whitespace-nowrap">
+                  Status
+                </th>
                 {metricColumns.flatMap((column) => [
                   <th
                     key={`${column.key}-request`}
@@ -341,12 +334,14 @@ function QueueTable({
             <tbody>
               {rows.map((row) => (
                 <tr key={row.orderId} className="align-top">
-                  <TextCell value={row.kodeOrder} strong />
                   <TextCell value={row.tanggalOrder} />
-                  <TextCell value={row.shift} />
-                  <TextCell value={row.dayNight} />
+                  <TextCell value={row.time} />
+                  <TextCell value={row.kodeOrder} strong />
                   <TextCell value={row.truckType} />
                   <NumericCell value={row.ritaseRequest} />
+                  <td className="border-b border-r border-slate-200 bg-white px-4 py-3 whitespace-nowrap">
+                    <StatusBadge status={row.statusOrder} />
+                  </td>
                   {metricColumns.flatMap((column) => [
                     <NumericCell
                       key={`${row.orderId}-${column.key}-request`}
@@ -571,10 +566,9 @@ function MetaField({ label, value }: { label: string; value: string }) {
 }
 
 const baseColumns: Array<{ key: keyof ReceivingQueueRow; label: string; align?: "left" | "right" }> = [
-  { key: "kodeOrder", label: "Kode Order" },
-  { key: "tanggalOrder", label: "Tanggal Order" },
-  { key: "shift", label: "Shift" },
-  { key: "dayNight", label: "Day / Night" },
+  { key: "tanggalOrder", label: "Tanggal" },
+  { key: "time", label: "Waktu" },
+  { key: "kodeOrder", label: "Kode" },
   { key: "truckType", label: "Truck Type" },
   { key: "ritaseRequest", label: "Ritase", align: "right" },
 ];
@@ -672,6 +666,20 @@ function RemarksCell({ value }: { value: string }) {
   );
 }
 
+function StatusBadge({ status }: { status: string }) {
+  const normalized = status.toLowerCase();
+  const className =
+    normalized === "checked"
+      ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+      : normalized === "confirmed"
+        ? "border-sky-200 bg-sky-50 text-sky-700"
+        : normalized === "submitted"
+          ? "border-amber-200 bg-amber-50 text-amber-700"
+          : "border-slate-200 bg-slate-50 text-slate-700";
+
+  return <span className={`rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${className}`}>{status}</span>;
+}
+
 function buildReceivingColumnGroups(showReceived: boolean, showAction: boolean) {
   return [
     { key: "identity", label: "Informasi", colSpan: 6, className: "bg-slate-100 text-slate-700" },
@@ -684,6 +692,20 @@ function buildReceivingColumnGroups(showReceived: boolean, showAction: boolean) 
     { key: "remarks", label: "Remarks", colSpan: 1, className: "bg-slate-100 text-slate-700" },
     ...(showAction ? [{ key: "action", label: "Action", colSpan: 1, className: "bg-slate-900 text-white" }] : []),
   ];
+}
+
+function getReceivingActionLabel(order: ReceivingQueueRow, userRole: AppRole) {
+  const status = order.statusOrder.toLowerCase();
+
+  if (status === "confirmed") {
+    return "Check";
+  }
+
+  if (status === "checked" || userRole === "ADMIN") {
+    return "Edit";
+  }
+
+  return null;
 }
 
 function getReceivingMetricLabel(key: ReceivingMetricKey) {

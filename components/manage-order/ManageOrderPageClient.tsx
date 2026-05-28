@@ -411,7 +411,7 @@ function DeliveryTabForm({
   const [deliveryNote, setDeliveryNote] = useState(row.deliveryNote === "-" ? "" : row.deliveryNote);
   const [remarksDelivery, setRemarksDelivery] = useState(row.remarksDelivery === "-" ? "" : row.remarksDelivery);
   const [confirmValues, setConfirmValues] = useState<Record<string, string>>(
-    Object.fromEntries(row.details.map((item) => [item.itemCode, String(item.qtyConfirm ?? 0)]))
+    Object.fromEntries(row.details.map((item) => [item.itemCode, formatInitialQuantityInput(item.qtyConfirm)]))
   );
   const [shellStatuses, setShellStatuses] = useState<ShellStatusMap>(() => buildInitialShellStatuses(row));
   const [saving, setSaving] = useState(false);
@@ -420,7 +420,7 @@ function DeliveryTabForm({
   useEffect(() => {
     setDeliveryNote(row.deliveryNote === "-" ? "" : row.deliveryNote);
     setRemarksDelivery(row.remarksDelivery === "-" ? "" : row.remarksDelivery);
-    setConfirmValues(Object.fromEntries(row.details.map((item) => [item.itemCode, String(item.qtyConfirm ?? 0)])));
+    setConfirmValues(Object.fromEntries(row.details.map((item) => [item.itemCode, formatInitialQuantityInput(item.qtyConfirm)])));
     setShellStatuses(buildInitialShellStatuses(row));
     setFormError("");
   }, [row]);
@@ -534,7 +534,12 @@ function DeliveryTabForm({
                     min={0}
                     inputMode="numeric"
                     value={confirmValues[item.itemCode] ?? ""}
-                    onChange={(event) => setConfirmValues((current) => ({ ...current, [item.itemCode]: event.target.value }))}
+                    onFocus={(event) => {
+                      if (event.currentTarget.value === "0") {
+                        event.currentTarget.select();
+                      }
+                    }}
+                    onChange={(event) => setConfirmValues((current) => ({ ...current, [item.itemCode]: normalizeQuantityInput(event.target.value) }))}
                     className="ml-auto block h-11 w-28 rounded-xl border border-slate-300 px-3 text-right text-sm text-slate-700 outline-none transition focus:border-sky-500"
                   />
                 </td>
@@ -1189,4 +1194,17 @@ function getManageGroupCellClassName(group: ManageMetricKey) {
 
 function formatNumber(value: number) {
   return new Intl.NumberFormat("id-ID").format(value);
+}
+
+function normalizeQuantityInput(value: string) {
+  if (value.trim() === "") {
+    return "";
+  }
+
+  const normalized = value.replace(/^0+(?=\d)/, "");
+  return normalized || "0";
+}
+
+function formatInitialQuantityInput(value: number | null | undefined) {
+  return value && value > 0 ? String(value) : "";
 }

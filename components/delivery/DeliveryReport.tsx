@@ -64,6 +64,7 @@ export default function DeliveryReport({
   const [formError, setFormError] = useState("");
   const [toastMessage, setToastMessage] = useState("");
   const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const orderRows = [...activeOrders, ...finishedOrders];
 
   useEffect(() => {
     return () => {
@@ -78,7 +79,7 @@ export default function DeliveryReport({
     setDeliveryNote(order.deliveryNote === "-" ? "" : order.deliveryNote);
     setRemarksDelivery(order.remarksDelivery === "-" ? "" : order.remarksDelivery);
     setConfirmValues(
-      Object.fromEntries(order.items.map((item) => [item.itemCode, String(item.qtyConfirm ?? 0)]))
+      Object.fromEntries(order.items.map((item) => [item.itemCode, formatInitialQuantityInput(item.qtyConfirm)]))
     );
     setShellStatuses(buildInitialShellStatuses(order));
     setFormError("");
@@ -207,23 +208,12 @@ export default function DeliveryReport({
       </div>
 
       <QueueTable
-        title="Active Order"
-        description={`Order dengan status Submitted untuk ${formatFilterLabel(selectedFilter)}.`}
-        rows={activeOrders}
-        showDelivery={false}
-        onAction={openConfirmModal}
-        getActionLabel={() => "Konfirmasi"}
-      />
-
-      <QueueTable
-        title="Finish Order"
-        description={`Order dengan status Confirmed / Checked untuk ${formatFilterLabel(selectedFilter)}.`}
-        rows={finishedOrders}
+        title="Order List"
+        description={`Daftar order untuk ${formatFilterLabel(selectedFilter)}.`}
+        rows={orderRows}
         showDelivery
         onAction={openConfirmModal}
-        getActionLabel={(order) =>
-          order.statusOrder.toLowerCase() === "confirmed" || userRole === "ADMIN" ? "Edit" : null
-        }
+        getActionLabel={(order) => getDeliveryActionLabel(order, userRole)}
       />
 
       {selectedOrder ? (
@@ -289,7 +279,7 @@ function QueueTable({
 
       {rows.length === 0 ? (
         <div className="px-5 py-10 text-center text-sm text-slate-500">
-          Tidak ada data yang bisa ditampilkan pada section ini.
+          Tidak ada order pada filter ini.
         </div>
       ) : (
         <div className="overflow-x-auto">
@@ -317,6 +307,9 @@ function QueueTable({
                     {column.label}
                   </th>
                 ))}
+                <th className="border-b border-r border-slate-200 bg-white px-4 py-3 text-left font-semibold whitespace-nowrap">
+                  Status
+                </th>
                 {metricColumns.flatMap((column) => [
                   <th
                     key={`${column.key}-request`}
@@ -331,6 +324,12 @@ function QueueTable({
                         className={`border-b border-r border-slate-200 px-4 py-3 text-right font-semibold whitespace-nowrap ${getDeliveryGroupCellClassName(column.key)}`}
                       >
                         Delivery
+                      </th>,
+                      <th
+                        key={`${column.key}-received`}
+                        className={`border-b border-r border-slate-200 px-4 py-3 text-right font-semibold whitespace-nowrap ${getDeliveryGroupCellClassName(column.key)}`}
+                      >
+                        Received
                       </th>,
                     ]
                     : []),
@@ -348,12 +347,14 @@ function QueueTable({
             <tbody>
               {rows.map((row) => (
                 <tr key={row.orderId} className="align-top">
-                  <TextCell value={row.kodeOrder} strong />
                   <TextCell value={row.tanggalOrder} />
-                  <TextCell value={row.shift} />
-                  <TextCell value={row.dayNight} />
+                  <TextCell value={row.time} />
+                  <TextCell value={row.kodeOrder} strong />
                   <TextCell value={row.truckType} />
                   <NumericCell value={row.ritaseRequest} />
+                  <td className="border-b border-r border-slate-200 bg-white px-4 py-3 whitespace-nowrap">
+                    <StatusBadge status={row.statusOrder} />
+                  </td>
                   {metricColumns.flatMap((column) => [
                     <NumericCell
                       key={`${row.orderId}-${column.key}-request`}
@@ -365,6 +366,11 @@ function QueueTable({
                         <NumericCell
                           key={`${row.orderId}-${column.key}-delivery`}
                           value={row[column.key].delivery}
+                          group={column.key}
+                        />,
+                        <NumericCell
+                          key={`${row.orderId}-${column.key}-received`}
+                          value={row[column.key].received ?? 0}
                           group={column.key}
                         />,
                       ]
@@ -500,7 +506,12 @@ function ConfirmDeliveryModal({
                         min={0}
                         inputMode="numeric"
                         value={confirmValues[item.itemCode] ?? ""}
-                        onChange={(event) => onQtyConfirmChange(item.itemCode, event.target.value)}
+                        onFocus={(event) => {
+                          if (event.currentTarget.value === "0") {
+                            event.currentTarget.select();
+                          }
+                        }}
+                        onChange={(event) => onQtyConfirmChange(item.itemCode, normalizeQuantityInput(event.target.value))}
                         className="ml-auto block h-11 w-28 rounded-xl border border-slate-300 px-3 text-right text-sm text-slate-700 outline-none transition focus:border-sky-500"
                       />
                     </td>
@@ -624,10 +635,9 @@ function LegendBadge({ label, className }: { label: string; className: string })
 }
 
 const baseColumns: Array<{ key: keyof DeliveryQueueRow; label: string; align?: "left" | "right" }> = [
-  { key: "kodeOrder", label: "Kode Order" },
-  { key: "tanggalOrder", label: "Tanggal Order" },
-  { key: "shift", label: "Shift" },
-  { key: "dayNight", label: "Day / Night" },
+  { key: "tanggalOrder", label: "Tanggal" },
+  { key: "time", label: "Waktu" },
+  { key: "kodeOrder", label: "Kode" },
   { key: "truckType", label: "Truck Type" },
   { key: "ritaseRequest", label: "Ritase", align: "right" },
 ];
@@ -788,18 +798,50 @@ function RemarksCell({ value }: { value: string }) {
   );
 }
 
+function StatusBadge({ status }: { status: string }) {
+  const normalized = status.toLowerCase();
+  const className =
+    normalized === "checked"
+      ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+      : normalized === "confirmed"
+        ? "border-sky-200 bg-sky-50 text-sky-700"
+        : normalized === "submitted"
+          ? "border-amber-200 bg-amber-50 text-amber-700"
+          : "border-slate-200 bg-slate-50 text-slate-700";
+
+  return <span className={`rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${className}`}>{status}</span>;
+}
+
 function buildDeliveryColumnGroups(showDelivery: boolean, showAction: boolean) {
   return [
     { key: "identity", label: "Informasi", colSpan: 6, className: "bg-slate-100 text-slate-700" },
     ...metricColumns.map((column) => ({
       key: column.key,
       label: getDeliveryMetricLabel(column.key),
-      colSpan: showDelivery ? 2 : 1,
+      colSpan: showDelivery ? 3 : 1,
       className: getDeliveryGroupHeaderClassName(column.key),
     })),
     { key: "remarks", label: "Remarks", colSpan: 1, className: "bg-slate-100 text-slate-700" },
     ...(showAction ? [{ key: "action", label: "Action", colSpan: 1, className: "bg-slate-900 text-white" }] : []),
   ];
+}
+
+function getDeliveryActionLabel(order: DeliveryQueueRow, userRole: AppRole) {
+  const status = order.statusOrder.toLowerCase();
+
+  if (status === "submitted") {
+    return "Konfirmasi";
+  }
+
+  if (status === "confirmed") {
+    return "Edit";
+  }
+
+  if (status === "checked" && userRole === "ADMIN") {
+    return "Edit";
+  }
+
+  return null;
 }
 
 function getDeliveryMetricLabel(key: DeliveryMetricKey) {
@@ -851,6 +893,19 @@ function formatDateOption(value: string) {
 
 function formatNumber(value: number) {
   return new Intl.NumberFormat("id-ID").format(value);
+}
+
+function normalizeQuantityInput(value: string) {
+  if (value.trim() === "") {
+    return "";
+  }
+
+  const normalized = value.replace(/^0+(?=\d)/, "");
+  return normalized || "0";
+}
+
+function formatInitialQuantityInput(value: number | null | undefined) {
+  return value && value > 0 ? String(value) : "";
 }
 
 const MONTH_NAMES_FULL = [

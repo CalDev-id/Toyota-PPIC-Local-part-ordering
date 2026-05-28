@@ -28,6 +28,7 @@ export type DeliveryQueueRow = {
   orderId: string;
   kodeOrder: string;
   tanggalOrder: string;
+  time: string;
   shift: string;
   dayNight: string;
   truckType: string;
@@ -61,6 +62,7 @@ export type DeliveryOrderItem = {
   qtyOrder: number;
   gapRequestQty: number;
   qtyConfirm: number;
+  qtyReceived: number;
   lineNo: number;
 };
 
@@ -104,6 +106,7 @@ export async function getDeliveryPageData(filter: OrderingFilter): Promise<Deliv
           qtyOrder: true,
           gapRequestQty: true,
           qtyConfirm: true,
+          qtyReceived: true,
           lineNo: true,
         },
         orderBy: [{ lineNo: "asc" }, { detailId: "asc" }],
@@ -126,6 +129,7 @@ export async function getDeliveryPageData(filter: OrderingFilter): Promise<Deliv
         order: detail.qtyOrder ?? 0,
         gapRequest: detail.gapRequestQty ?? 0,
         delivery: detail.qtyConfirm ?? 0,
+        received: detail.qtyReceived ?? 0,
       };
     }
 
@@ -133,6 +137,7 @@ export async function getDeliveryPageData(filter: OrderingFilter): Promise<Deliv
       orderId: header.orderId,
       kodeOrder: header.kodeOrder,
       tanggalOrder: formatDateLabel(header.tanggalOrder),
+      time: formatTimeLabel(header.waktuOrder),
       shift: normalizeText(header.shift),
       dayNight: normalizeText(header.dayNight),
       truckType: normalizeText(header.truckType),
@@ -149,6 +154,7 @@ export async function getDeliveryPageData(filter: OrderingFilter): Promise<Deliv
         qtyOrder: detail.qtyOrder ?? 0,
         gapRequestQty: detail.gapRequestQty ?? 0,
         qtyConfirm: detail.qtyConfirm ?? 0,
+        qtyReceived: detail.qtyReceived ?? 0,
         lineNo: detail.lineNo ?? 0,
       })),
       cb1tr: metrics.cb1tr,
@@ -215,6 +221,15 @@ function formatDateLabel(value: Date) {
   const month = MONTH_NAMES_SHORT[value.getUTCMonth()];
   const year = value.getUTCFullYear();
   return `${day} ${month} ${year}`;
+}
+
+function formatTimeLabel(value: Date): string {
+  return new Intl.DateTimeFormat("id-ID", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: "Asia/Jakarta",
+  }).format(value);
 }
 
 function parseShellState(

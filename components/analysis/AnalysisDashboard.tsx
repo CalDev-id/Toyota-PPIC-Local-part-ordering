@@ -105,13 +105,14 @@ export default function AnalysisDashboard({
           <p className="mt-1 text-sm text-slate-500">Plan, order, confirmed, dan received per item dalam 7 hari ke belakang.</p>
         </div>
 
-        <div className="grid min-w-0 gap-5 lg:grid-cols-2">
+        <div className="grid min-w-0 gap-4 lg:grid-cols-2 xl:grid-cols-3">
           {data.weeklyItemQuantity.map((item) => (
             <MultiLineChart
               key={item.key}
               title={item.label}
               data={item.points}
               valueFormatter={formatCompactQuantity}
+              compact
               series={[
                 { key: "plan", label: "Plan", color: seriesColors.plan, getValue: (point) => point.planQty },
                 { key: "order", label: "Order", color: seriesColors.order, getValue: (point) => point.orderQty },
@@ -145,6 +146,7 @@ function AnalysisColumn({
         data={chartData}
         valueFormatter={formatCompactQuantity}
         series={chartSeries}
+        compact
       />
     </div>
   );
@@ -200,12 +202,14 @@ function MultiLineChart<T extends { date: string; label: string }>({
   series,
   maxValue,
   valueFormatter,
+  compact = false,
 }: {
   title: string;
   data: T[];
   series: Array<LineSeries<T>>;
   maxValue?: number;
   valueFormatter: (value: number) => string;
+  compact?: boolean;
 }) {
   const [tooltip, setTooltip] = useState<{
     x: number;
@@ -217,11 +221,11 @@ function MultiLineChart<T extends { date: string; label: string }>({
     color: string;
   } | null>(null);
   const width = 520;
-  const height = 320;
+  const height = compact ? 260 : 320;
   const chartLeft = 56;
   const chartRight = 24;
-  const chartTop = 46;
-  const chartBottom = 252;
+  const chartTop = compact ? 28 : 46;
+  const chartBottom = compact ? 210 : 252;
   const chartWidth = width - chartLeft - chartRight;
   const chartHeight = chartBottom - chartTop;
   const safeData = data;
@@ -241,14 +245,17 @@ function MultiLineChart<T extends { date: string; label: string }>({
   return (
     <article className="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
       <h2 className="text-lg font-bold text-slate-950">{title}</h2>
-      <div className="mt-5 grid grid-cols-2 gap-x-4 gap-y-2 text-xs font-medium text-slate-600 sm:flex sm:flex-wrap sm:gap-x-5">
+      <div className={`${compact ? "mt-3" : "mt-5"} grid grid-cols-2 gap-x-4 gap-y-2 text-xs font-medium text-slate-600 sm:flex sm:flex-wrap sm:gap-x-5`}>
         {series.map((item) => (
           <LegendItem key={item.key} color={item.color} label={item.label} />
         ))}
       </div>
 
-      <div className="relative -mx-4 mt-5 overflow-x-auto px-4 sm:mx-0 sm:px-0" onMouseLeave={() => setTooltip(null)}>
-        <svg viewBox={`0 0 ${width} ${height}`} className="h-[17.5rem] w-full min-w-[420px] sm:h-[20rem] sm:min-w-[460px]">
+      <div className={`relative -mx-4 ${compact ? "mt-3" : "mt-5"} overflow-x-auto px-4 sm:mx-0 sm:px-0`} onMouseLeave={() => setTooltip(null)}>
+        <svg
+          viewBox={`0 0 ${width} ${height}`}
+          className={`${compact ? "h-[14.5rem] sm:h-[16rem]" : "h-[17.5rem] sm:h-[20rem]"} w-full min-w-[420px] sm:min-w-[460px]`}
+        >
           <line x1={chartLeft} y1={chartTop} x2={chartLeft} y2={chartBottom} stroke="#e2e8f0" strokeWidth="2" />
           <line x1={chartLeft} y1={chartBottom} x2={width - chartRight} y2={chartBottom} stroke="#e2e8f0" strokeWidth="2" />
 

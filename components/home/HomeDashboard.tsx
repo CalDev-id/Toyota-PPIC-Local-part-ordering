@@ -87,9 +87,11 @@ export default function HomeDashboard({ data, errorMessage }: HomeDashboardProps
         ))}
       </section>
 
-      <section className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1.6fr)_minmax(320px,0.8fr)]">
+      <section className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
         <PlanOrderConfirmedReceivedChart data={data.requestVsConfirmedPerItem} />
-        <PlanCoverageChart data={data} />
+        <div className="w-full max-w-[360px] justify-self-center xl:justify-self-end">
+          <PlanCoverageChart data={data} />
+        </div>
       </section>
     </section>
   );
@@ -299,87 +301,51 @@ function PlanOrderConfirmedReceivedChart({
 function PlanCoverageChart({ data }: { data: HomeDashboardData }) {
   const orderQty = data.totals.orderQty;
   const deliveryQty = data.totals.confirmedQty;
-  const maxQty = Math.max(orderQty, deliveryQty, 1);
+  const gapQty = Math.max(orderQty - deliveryQty, 0);
   const progress = orderQty > 0 ? Math.min((deliveryQty / orderQty) * 100, 100) : 0;
   const progressLabel = `${Math.round(progress)}%`;
-  const orderRadius = 62;
-  const deliveryRadius = 86;
-  const ringStroke = 18;
-  const orderCircumference = orderRadius * 2 * Math.PI;
-  const deliveryCircumference = deliveryRadius * 2 * Math.PI;
-  const orderLength = (orderQty / maxQty) * orderCircumference;
-  const deliveryLength = (deliveryQty / maxQty) * deliveryCircumference;
 
   return (
     <article className="h-full min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
       <div className="flex items-start justify-between">
         <div>
-          <h2 className="text-lg font-semibold text-slate-950">Plan Coverage</h2>
+          <h2 className="text-lg font-semibold text-slate-950">Order Coverage</h2>
           <p className="mt-1 text-sm text-slate-500">Delivery completed from order quantity</p>
         </div>
-        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">
-          {orderQty > 0 ? `${Math.round((deliveryQty / orderQty) * 100)}%` : "0%"}
+        <span
+          className={`rounded-full px-2.5 py-1 text-xs font-medium ${
+            progress >= 100 ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"
+          }`}
+        >
+          {progressLabel}
         </span>
       </div>
 
-      <div className="mt-8 flex justify-center">
-        <svg viewBox="0 0 216 216" className="h-52 w-52 shrink-0">
-          <g transform="rotate(-90 108 108)">
-            <circle
-              stroke="#f3f4f6"
-              fill="transparent"
-              strokeWidth={ringStroke}
-              r={deliveryRadius}
-              cx="108"
-              cy="108"
-            />
-            <circle
-              stroke="#9ca3af"
-              fill="transparent"
-              strokeLinecap="round"
-              strokeWidth={ringStroke}
-              strokeDasharray={`${deliveryLength} ${deliveryCircumference - deliveryLength}`}
-              r={deliveryRadius}
-              cx="108"
-              cy="108"
-            />
-            <circle
-              stroke="#e0f2fe"
-              fill="transparent"
-              strokeWidth={ringStroke}
-              r={orderRadius}
-              cx="108"
-              cy="108"
-            />
-            <circle
-              stroke="#0ea5e9"
-              fill="transparent"
-              strokeLinecap="round"
-              strokeWidth={ringStroke}
-              strokeDasharray={`${orderLength} ${orderCircumference - orderLength}`}
-              r={orderRadius}
-              cx="108"
-              cy="108"
-            />
-          </g>
-          <text x="108" y="104" textAnchor="middle" className="fill-slate-950 text-[30px] font-semibold">
-            {progressLabel}
-          </text>
-          <text x="108" y="126" textAnchor="middle" className="fill-slate-500 text-xs font-medium">
-            Progress
-          </text>
-        </svg>
+      <div
+        className="mx-auto mt-8 grid h-52 w-52 place-items-center rounded-full border border-sky-100 p-[18px] shadow-inner"
+        style={{
+          background: `conic-gradient(#0ea5e9 ${Math.min(Math.max(progress, 0), 100)}%, #e0f2fe 0)`,
+        }}
+      >
+        <div className="grid h-36 w-36 place-items-center rounded-full bg-white text-center shadow-sm">
+          <div>
+            <p className="text-3xl font-semibold text-slate-950">{progressLabel}</p>
+            <p className="mt-1 text-xs font-medium text-slate-500">Progress</p>
+          </div>
+        </div>
       </div>
 
-      <div className="mt-8 grid grid-cols-2 divide-x divide-slate-200 rounded-2xl bg-slate-50 p-4 text-center">
-        <div className="px-2">
-          <p className="text-sm font-semibold text-slate-500">Order Qty</p>
-          <p className="mt-1 text-base font-bold text-slate-950 tabular-nums">{formatQuantity(orderQty)}</p>
-        </div>
-        <div className="px-2">
-          <p className="text-sm font-semibold text-slate-500">Delivery Qty</p>
-          <p className="mt-1 text-base font-bold text-slate-950 tabular-nums">{formatQuantity(deliveryQty)}</p>
-        </div>
+      <div className="mt-8 grid grid-cols-3 divide-x divide-slate-200 rounded-2xl bg-slate-50 p-4 text-center">
+        {[
+          ["Order", formatQuantity(orderQty)],
+          ["Delivery", formatQuantity(deliveryQty)],
+          ["Gap", formatQuantity(gapQty)],
+        ].map(([label, value]) => (
+          <div key={label} className="px-2">
+            <p className="text-xs font-medium text-slate-500">{label}</p>
+            <p className="mt-1 text-sm font-semibold text-slate-950 tabular-nums">{value}</p>
+          </div>
+        ))}
       </div>
     </article>
   );

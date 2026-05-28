@@ -94,14 +94,19 @@ const tableColumns: Array<{
     | keyof OrderReportRow
     | "cb1trRequest"
     | "cb1trDelivery"
+    | "cb1trReceived"
     | "cb2trRequest"
     | "cb2trDelivery"
+    | "cb2trReceived"
     | "camNo01Request"
     | "camNo01Delivery"
+    | "camNo01Received"
     | "camNo02Request"
     | "camNo02Delivery"
+    | "camNo02Received"
     | "cr1trRequest"
     | "cr1trDelivery"
+    | "cr1trReceived"
     | "remarksOrdering"
     | "remarksDelivery"
     | "remarksReceiving"
@@ -115,16 +120,22 @@ const tableColumns: Array<{
   { key: "code", label: "Kode", group: "identity" },
   { key: "truckType", label: "Truck Type", group: "identity" },
   { key: "ritaseRequest", label: "Ritase", align: "right", group: "identity" },
+  { key: "statusOrder", label: "Status", group: "identity" },
   { key: "cb1trRequest", label: "Request", align: "right", group: "cb1tr" },
   { key: "cb1trDelivery", label: "Delivery", align: "right", group: "cb1tr" },
+  { key: "cb1trReceived", label: "Received", align: "right", group: "cb1tr" },
   { key: "cb2trRequest", label: "Request", align: "right", group: "cb2tr" },
   { key: "cb2trDelivery", label: "Delivery", align: "right", group: "cb2tr" },
+  { key: "cb2trReceived", label: "Received", align: "right", group: "cb2tr" },
   { key: "camNo01Request", label: "Request", align: "right", group: "camNo01" },
   { key: "camNo01Delivery", label: "Delivery", align: "right", group: "camNo01" },
+  { key: "camNo01Received", label: "Received", align: "right", group: "camNo01" },
   { key: "camNo02Request", label: "Request", align: "right", group: "camNo02" },
   { key: "camNo02Delivery", label: "Delivery", align: "right", group: "camNo02" },
+  { key: "camNo02Received", label: "Received", align: "right", group: "camNo02" },
   { key: "cr1trRequest", label: "Request", align: "right", group: "cr1tr" },
   { key: "cr1trDelivery", label: "Delivery", align: "right", group: "cr1tr" },
+  { key: "cr1trReceived", label: "Received", align: "right", group: "cr1tr" },
   { key: "remarksOrdering", label: "Ordering", group: "remarks" },
   { key: "remarksDelivery", label: "Delivery", group: "remarks" },
   { key: "remarksReceiving", label: "Receiving", group: "remarks" },
@@ -147,9 +158,6 @@ export default function OrderingReport({
   const [toast, setToast] = useState<ToastState>(null);
   const [activeModal, setActiveModal] = useState<"junbiki" | "pallet" | "gap" | null>(null);
   const gapItems = buildGapItems(summaries);
-  const activeRows = rows.filter((row) => row.statusOrder.toLowerCase() === "submitted");
-  const deliveryRows = rows.filter((row) => row.statusOrder.toLowerCase() === "confirmed");
-  const finishedRows = rows.filter((row) => row.statusOrder.toLowerCase() === "checked");
 
   async function handleDelete(orderId: string) {
     try {
@@ -282,41 +290,14 @@ export default function OrderingReport({
       </div>
 
       <OrderQueueTable
-        title="Active Order"
-        description={`Order dengan status Submitted untuk ${formatFilterLabel(selectedFilter)}.`}
-        rows={activeRows}
+        title="Order List"
+        description={`Daftar order untuk ${formatFilterLabel(selectedFilter)}.`}
+        rows={rows}
         deletingId={deletingId}
         pendingDeleteId={pendingDelete?.orderId ?? null}
         onRequestDelete={setPendingDelete}
         onEdit={handleEdit}
         loadingEditId={loadingEditId}
-        showDelivery={false}
-        userRole={userRole}
-      />
-
-      <OrderQueueTable
-        title="Delivery Order"
-        description={`Order dengan status Confirmed untuk ${formatFilterLabel(selectedFilter)}.`}
-        rows={deliveryRows}
-        deletingId={deletingId}
-        pendingDeleteId={pendingDelete?.orderId ?? null}
-        onRequestDelete={setPendingDelete}
-        onEdit={handleEdit}
-        loadingEditId={loadingEditId}
-        showDelivery
-        userRole={userRole}
-      />
-
-      <OrderQueueTable
-        title="Finish Order"
-        description={`Order dengan status Checked untuk ${formatFilterLabel(selectedFilter)}.`}
-        rows={finishedRows}
-        deletingId={deletingId}
-        pendingDeleteId={pendingDelete?.orderId ?? null}
-        onRequestDelete={setPendingDelete}
-        onEdit={handleEdit}
-        loadingEditId={loadingEditId}
-        showDelivery
         userRole={userRole}
       />
 
@@ -774,7 +755,6 @@ function OrderQueueTable({
   onRequestDelete,
   onEdit,
   loadingEditId,
-  showDelivery,
   userRole,
 }: {
   title: string;
@@ -785,7 +765,6 @@ function OrderQueueTable({
   onRequestDelete: (row: OrderReportRow | null) => void;
   onEdit: (row: OrderReportRow) => void;
   loadingEditId: string | null;
-  showDelivery: boolean;
   userRole: AppRole;
 }) {
   return (
@@ -797,14 +776,14 @@ function OrderQueueTable({
 
       {rows.length === 0 ? (
         <div className="px-5 py-10 text-center text-sm text-slate-500">
-          Tidak ada data order yang bisa ditampilkan pada section ini.
+          Tidak ada order pada filter ini.
         </div>
       ) : (
         <div className="overflow-x-auto">
           <table className="min-w-full border-separate border-spacing-0 text-sm">
             <thead className="text-slate-700">
               <tr>
-                {buildOrderColumnGroups(showDelivery).map((group) => (
+                {buildOrderColumnGroups().map((group) => (
                   <th
                     key={group.key}
                     colSpan={group.colSpan}
@@ -815,18 +794,16 @@ function OrderQueueTable({
                 ))}
               </tr>
               <tr>
-                {tableColumns
-                  .filter((column) => showDelivery || !String(column.key).toLowerCase().includes("delivery"))
-                  .map((column) => (
-                    <th
-                      key={column.key}
-                      className={`border-b border-r border-slate-200 px-4 py-3 font-semibold whitespace-nowrap ${getOrderGroupCellClassName(column.group)} ${
-                        column.align === "right" ? "text-right" : "text-left"
-                      }`}
-                    >
-                      {column.label}
-                    </th>
-                  ))}
+                {tableColumns.map((column) => (
+                  <th
+                    key={column.key}
+                    className={`border-b border-r border-slate-200 px-4 py-3 font-semibold whitespace-nowrap ${getOrderGroupCellClassName(column.group)} ${
+                      column.align === "right" ? "text-right" : "text-left"
+                    }`}
+                  >
+                    {column.label}
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>
@@ -837,16 +814,24 @@ function OrderQueueTable({
                   <TextTableCell value={row.code} group="identity" strong />
                   <TextTableCell value={row.truckType} group="identity" />
                   <NumericCell value={row.ritaseRequest} group="identity" />
+                  <td className="border-b border-r border-slate-200 bg-white px-4 py-3 whitespace-nowrap">
+                    <StatusBadge status={row.statusOrder} />
+                  </td>
                   <NumericCell value={getOrderRequestQty(row, "cb1tr")} group="cb1tr" />
-                  {showDelivery ? <NumericCell value={row.cb1tr.delivery} group="cb1tr" /> : null}
+                  <NumericCell value={row.cb1tr.delivery} group="cb1tr" />
+                  <NumericCell value={row.cb1tr.received ?? 0} group="cb1tr" />
                   <NumericCell value={getOrderRequestQty(row, "cb2tr")} group="cb2tr" />
-                  {showDelivery ? <NumericCell value={row.cb2tr.delivery} group="cb2tr" /> : null}
+                  <NumericCell value={row.cb2tr.delivery} group="cb2tr" />
+                  <NumericCell value={row.cb2tr.received ?? 0} group="cb2tr" />
                   <NumericCell value={getOrderRequestQty(row, "camNo01")} group="camNo01" />
-                  {showDelivery ? <NumericCell value={row.camNo01.delivery} group="camNo01" /> : null}
+                  <NumericCell value={row.camNo01.delivery} group="camNo01" />
+                  <NumericCell value={row.camNo01.received ?? 0} group="camNo01" />
                   <NumericCell value={getOrderRequestQty(row, "camNo02")} group="camNo02" />
-                  {showDelivery ? <NumericCell value={row.camNo02.delivery} group="camNo02" /> : null}
+                  <NumericCell value={row.camNo02.delivery} group="camNo02" />
+                  <NumericCell value={row.camNo02.received ?? 0} group="camNo02" />
                   <NumericCell value={getOrderRequestQty(row, "cr1tr")} group="cr1tr" />
-                  {showDelivery ? <NumericCell value={row.cr1tr.delivery} group="cr1tr" /> : null}
+                  <NumericCell value={row.cr1tr.delivery} group="cr1tr" />
+                  <NumericCell value={row.cr1tr.received ?? 0} group="cr1tr" />
                   <RemarksCell value={row.remarksOrdering} />
                   <RemarksCell value={row.remarksDelivery} />
                   <RemarksCell value={row.remarksReceiving} />
@@ -994,14 +979,28 @@ function RemarksCell({ value }: { value: string }) {
   );
 }
 
-function buildOrderColumnGroups(showDelivery: boolean) {
+function StatusBadge({ status }: { status: string }) {
+  const normalized = status.toLowerCase();
+  const className =
+    normalized === "checked"
+      ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+      : normalized === "confirmed"
+        ? "border-sky-200 bg-sky-50 text-sky-700"
+        : normalized === "submitted"
+          ? "border-amber-200 bg-amber-50 text-amber-700"
+          : "border-slate-200 bg-slate-50 text-slate-700";
+
+  return <span className={`rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${className}`}>{status}</span>;
+}
+
+function buildOrderColumnGroups() {
   return [
-    { key: "identity", label: "Informasi", colSpan: 5, className: "bg-slate-100 text-slate-700" },
-    { key: "cb1tr", label: "CB 1TR", colSpan: showDelivery ? 2 : 1, className: "bg-emerald-50 text-emerald-900" },
-    { key: "cb2tr", label: "CB 2TR", colSpan: showDelivery ? 2 : 1, className: "bg-sky-50 text-sky-900" },
-    { key: "camNo01", label: "Cam 01", colSpan: showDelivery ? 2 : 1, className: "bg-violet-50 text-violet-900" },
-    { key: "camNo02", label: "Cam 02", colSpan: showDelivery ? 2 : 1, className: "bg-rose-50 text-rose-900" },
-    { key: "cr1tr", label: "CR 1TR", colSpan: showDelivery ? 2 : 1, className: "bg-amber-50 text-amber-900" },
+    { key: "identity", label: "Informasi", colSpan: 6, className: "bg-slate-100 text-slate-700" },
+    { key: "cb1tr", label: "CB 1TR", colSpan: 3, className: "bg-emerald-50 text-emerald-900" },
+    { key: "cb2tr", label: "CB 2TR", colSpan: 3, className: "bg-sky-50 text-sky-900" },
+    { key: "camNo01", label: "Cam 01", colSpan: 3, className: "bg-violet-50 text-violet-900" },
+    { key: "camNo02", label: "Cam 02", colSpan: 3, className: "bg-rose-50 text-rose-900" },
+    { key: "cr1tr", label: "CR 1TR", colSpan: 3, className: "bg-amber-50 text-amber-900" },
     { key: "remarks", label: "Remarks", colSpan: 3, className: "bg-slate-100 text-slate-700" },
     { key: "actions", label: "Action", colSpan: 1, className: "bg-slate-900 text-white" },
   ];
