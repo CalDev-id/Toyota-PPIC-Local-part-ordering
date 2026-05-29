@@ -29,7 +29,7 @@ type AdminMenuGroup = {
 const adminMenuGroups: AdminMenuGroup[] = [
   { label: "Overview", items: ["Home", "Analysis", "Tracking"] },
   { label: "Ordering", items: ["Planning", "Ordering", "Recap", "Stock"] },
-  { label: "Fulfillment", items: ["Delivery", "Receiving"] },
+  { label: "Fulfillment", items: ["Delivery", "Receiving", "Return Defect"] },
   { label: "Admin", items: ["Manage Order", "Users"] },
 ];
 
@@ -153,6 +153,19 @@ const menuItems: MenuItem[] = [
         <path d="M7 17h5" />
         <circle cx="8" cy="17" r="1.5" />
         <circle cx="17" cy="17" r="1.5" />
+      </svg>
+    ),
+  },
+  {
+    label: "Return Defect",
+    href: "/return-defect",
+    roles: ["ADMIN", "ORDERING", "DELIVERY"],
+    icon: (
+      <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8">
+        <path d="M5 8h10a4 4 0 0 1 0 8H8" />
+        <path d="m8 5-3 3 3 3" />
+        <path d="M8 16v3h10" />
+        <path d="m18 16 3 3-3 3" />
       </svg>
     ),
   },

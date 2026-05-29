@@ -6,6 +6,58 @@ import { prisma } from "@/lib/prisma"
 import type { AppRole } from "@/lib/roles"
 import bcrypt from "bcrypt"
 
+const MAX_LOGIN_ATTEMPTS = 5
+const LOGIN_RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000
+
+type LoginAttempt = {
+  count: number
+  resetAt: number
+}
+
+const globalForRateLimit = globalThis as unknown as {
+  loginAttempts?: Map<string, LoginAttempt>
+}
+
+const loginAttempts = globalForRateLimit.loginAttempts ?? new Map<string, LoginAttempt>()
+globalForRateLimit.loginAttempts = loginAttempts
+
+function getLoginRateLimitKey(email: string) {
+  return email.trim().toLowerCase()
+}
+
+function isLoginRateLimited(key: string) {
+  const now = Date.now()
+  const attempt = loginAttempts.get(key)
+
+  if (!attempt) return false
+
+  if (attempt.resetAt <= now) {
+    loginAttempts.delete(key)
+    return false
+  }
+
+  return attempt.count >= MAX_LOGIN_ATTEMPTS
+}
+
+function recordFailedLogin(key: string) {
+  const now = Date.now()
+  const attempt = loginAttempts.get(key)
+
+  if (!attempt || attempt.resetAt <= now) {
+    loginAttempts.set(key, {
+      count: 1,
+      resetAt: now + LOGIN_RATE_LIMIT_WINDOW_MS
+    })
+    return
+  }
+
+  attempt.count += 1
+}
+
+function clearFailedLogins(key: string) {
+  loginAttempts.delete(key)
+}
+
 export const authOptions: NextAuthOptions = {
   secret: process.env.AUTH_SECRET,
 
@@ -19,19 +71,34 @@ export const authOptions: NextAuthOptions = {
       },
 
       async authorize(credentials) {
+        const email = typeof credentials?.email === "string" ? credentials.email : ""
+        const password = typeof credentials?.password === "string" ? credentials.password : ""
+        const rateLimitKey = getLoginRateLimitKey(email)
+
+        if (!email || !password || isLoginRateLimited(rateLimitKey)) {
+          return null
+        }
+
         const user = await prisma.user.findUnique({
-          where: { email: credentials?.email as string }
+          where: { email: rateLimitKey }
         })
 
-        if (!user) return null
+        if (!user) {
+          recordFailedLogin(rateLimitKey)
+          return null
+        }
 
         const valid = await bcrypt.compare(
-          credentials?.password as string,
+          password,
           user.password
         )
 
-        if (!valid) return null
+        if (!valid) {
+          recordFailedLogin(rateLimitKey)
+          return null
+        }
 
+        clearFailedLogins(rateLimitKey)
         return user
       }
     })

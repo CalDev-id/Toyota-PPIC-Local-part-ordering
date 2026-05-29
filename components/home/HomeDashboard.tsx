@@ -133,7 +133,7 @@ function PlanOrderConfirmedReceivedChart({
   const height = 350;
   const chartLeft = 58;
   const chartRight = 26;
-  const chartTop = 46;
+  const chartTop = 58;
   const chartBottom = 282;
   const chartWidth = width - chartLeft - chartRight;
   const chartHeight = chartBottom - chartTop;
@@ -216,37 +216,50 @@ function PlanOrderConfirmedReceivedChart({
                       const barHeight = Math.max(chartBottom - y, 2);
 
                       return (
-                        <rect
-                          key={bar.key}
-                          x={x}
-                          y={y}
-                          width={barWidth}
-                          height={barHeight}
-                          rx="4"
-                          fill={bar.color}
-                          className="cursor-pointer transition-opacity hover:opacity-80"
-                          onMouseEnter={() =>
-                            setTooltip({
-                              x: ((x + barWidth / 2) / width) * 100,
-                              y: (Math.max(y - 10, chartTop) / height) * 100,
-                              item: item.label,
-                              label: bar.label,
-                              value: bar.value,
-                              color: bar.color,
-                            })
-                          }
-                          onFocus={() =>
-                            setTooltip({
-                              x: ((x + barWidth / 2) / width) * 100,
-                              y: (Math.max(y - 10, chartTop) / height) * 100,
-                              item: item.label,
-                              label: bar.label,
-                              value: bar.value,
-                              color: bar.color,
-                            })
-                          }
-                          onMouseLeave={() => setTooltip(null)}
-                        />
+                        <g key={bar.key}>
+                          <rect
+                            x={x}
+                            y={y}
+                            width={barWidth}
+                            height={barHeight}
+                            rx="4"
+                            fill={bar.color}
+                            className="cursor-pointer transition-opacity hover:opacity-80"
+                            onMouseEnter={() =>
+                              setTooltip({
+                                x: ((x + barWidth / 2) / width) * 100,
+                                y: (Math.max(y - 10, chartTop) / height) * 100,
+                                item: item.label,
+                                label: bar.label,
+                                value: bar.value,
+                                color: bar.color,
+                              })
+                            }
+                            onFocus={() =>
+                              setTooltip({
+                                x: ((x + barWidth / 2) / width) * 100,
+                                y: (Math.max(y - 10, chartTop) / height) * 100,
+                                item: item.label,
+                                label: bar.label,
+                                value: bar.value,
+                                color: bar.color,
+                              })
+                            }
+                            onMouseLeave={() => setTooltip(null)}
+                          />
+                          <text
+                            x={x + barWidth / 2}
+                            y={Math.max(y - 7, chartTop - 10)}
+                            textAnchor="middle"
+                            className="text-[10px] font-semibold tabular-nums"
+                            fill={bar.color}
+                            stroke="white"
+                            strokeWidth="3"
+                            paintOrder="stroke"
+                          >
+                            {formatQuantity(bar.value)}
+                          </text>
+                        </g>
                       );
                     })}
                     <text

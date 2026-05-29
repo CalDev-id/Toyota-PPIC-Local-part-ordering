@@ -8,7 +8,6 @@ import type {
   AnalysisKpiKey,
   AnalysisKpiSummary,
 } from "@/lib/analysis";
-import { useState } from "react";
 
 type AnalysisDashboardProps = {
   data: AnalysisDashboardData;
@@ -111,7 +110,6 @@ export default function AnalysisDashboard({
               key={item.key}
               title={item.label}
               data={item.points}
-              valueFormatter={formatCompactQuantity}
               compact
               series={[
                 { key: "plan", label: "Plan", color: seriesColors.plan, getValue: (point) => point.planQty },
@@ -144,7 +142,6 @@ function AnalysisColumn({
       <MultiLineChart
         title={chartTitle}
         data={chartData}
-        valueFormatter={formatCompactQuantity}
         series={chartSeries}
         compact
       />
@@ -201,28 +198,17 @@ function MultiLineChart<T extends { date: string; label: string }>({
   data,
   series,
   maxValue,
-  valueFormatter,
   compact = false,
 }: {
   title: string;
   data: T[];
   series: Array<LineSeries<T>>;
   maxValue?: number;
-  valueFormatter: (value: number) => string;
   compact?: boolean;
 }) {
-  const [tooltip, setTooltip] = useState<{
-    x: number;
-    y: number;
-    placement: "top" | "bottom";
-    label: string;
-    seriesLabel: string;
-    value: number;
-    color: string;
-  } | null>(null);
   const width = 520;
   const height = compact ? 260 : 320;
-  const chartLeft = 56;
+  const chartLeft = 24;
   const chartRight = 24;
   const chartTop = compact ? 28 : 46;
   const chartBottom = compact ? 210 : 252;
@@ -232,6 +218,7 @@ function MultiLineChart<T extends { date: string; label: string }>({
   const rawMax = Math.max(...safeData.flatMap((point) => series.map((item) => item.getValue(point))), 1);
   const yMax = maxValue ?? getRoundedMax(rawMax);
   const xStep = chartWidth / Math.max(safeData.length - 1, 1);
+  const xLabelInterval = safeData.length > 21 ? 5 : safeData.length > 12 ? 2 : 1;
   const ticks = [0, 0.25, 0.5, 0.75, 1];
 
   function getX(index: number) {
@@ -240,6 +227,15 @@ function MultiLineChart<T extends { date: string; label: string }>({
 
   function getY(value: number) {
     return chartBottom - (Math.min(value, yMax) / yMax) * chartHeight;
+  }
+
+  function getValueLabelY(y: number, seriesIndex: number) {
+    const offsets = [-12, 18, -28, 34];
+    const offset = offsets[seriesIndex % offsets.length];
+    const minY = chartTop + 10;
+    const maxY = chartBottom - 6;
+
+    return Math.min(Math.max(y + offset, minY), maxY);
   }
 
   return (
@@ -251,23 +247,18 @@ function MultiLineChart<T extends { date: string; label: string }>({
         ))}
       </div>
 
-      <div className={`relative -mx-4 ${compact ? "mt-3" : "mt-5"} overflow-x-auto px-4 sm:mx-0 sm:px-0`} onMouseLeave={() => setTooltip(null)}>
+      <div className={`relative -mx-4 ${compact ? "mt-3" : "mt-5"} overflow-x-auto px-4 sm:mx-0 sm:px-0`}>
         <svg
           viewBox={`0 0 ${width} ${height}`}
           className={`${compact ? "h-[14.5rem] sm:h-[16rem]" : "h-[17.5rem] sm:h-[20rem]"} w-full min-w-[420px] sm:min-w-[460px]`}
         >
-          <line x1={chartLeft} y1={chartTop} x2={chartLeft} y2={chartBottom} stroke="#e2e8f0" strokeWidth="2" />
           <line x1={chartLeft} y1={chartBottom} x2={width - chartRight} y2={chartBottom} stroke="#e2e8f0" strokeWidth="2" />
 
           {ticks.map((tick) => {
             const y = chartBottom - chartHeight * tick;
-            const value = yMax * tick;
             return (
               <g key={tick}>
                 <line x1={chartLeft} y1={y} x2={width - chartRight} y2={y} stroke="#f1f5f9" strokeWidth="1" />
-                <text x={chartLeft - 12} y={y + 4} textAnchor="end" className="fill-slate-500 text-[12px]">
-                  {valueFormatter(value)}
-                </text>
               </g>
             );
           })}
@@ -291,77 +282,70 @@ function MultiLineChart<T extends { date: string; label: string }>({
                   strokeLinecap="round"
                   strokeLinejoin="round"
                 />
-                {safeData.map((point, index) => {
-                  const value = item.getValue(point);
-                  const x = getX(index);
-                  const y = getY(value);
-
-                  return (
-                    <circle
-                      key={`${item.key}-${point.date}`}
-                      cx={x}
-                      cy={y}
-                      r="6"
-                      fill={item.color}
-                      stroke="white"
-                      strokeWidth="2"
-                      className="cursor-pointer transition-opacity hover:opacity-80"
-                      onMouseEnter={() =>
-                        setTooltip({
-                          x: (x / width) * 100,
-                          y: ((y < chartTop + 34 ? y + 16 : y - 10) / height) * 100,
-                          placement: y < chartTop + 34 ? "bottom" : "top",
-                          label: point.label,
-                          seriesLabel: item.label,
-                          value,
-                          color: item.color,
-                        })
-                      }
-                      onFocus={() =>
-                        setTooltip({
-                          x: (x / width) * 100,
-                          y: ((y < chartTop + 34 ? y + 16 : y - 10) / height) * 100,
-                          placement: y < chartTop + 34 ? "bottom" : "top",
-                          label: point.label,
-                          seriesLabel: item.label,
-                          value,
-                          color: item.color,
-                        })
-                      }
-                      onMouseLeave={() => setTooltip(null)}
-                    />
-                  );
-                })}
               </g>
             );
           }) : null}
 
-          {safeData.map((point, index) => (
-            <text key={point.date} x={getX(index)} y={chartBottom + 30} textAnchor="middle" className="fill-slate-600 text-[12px]">
-              {point.label}
-            </text>
-          ))}
+          {safeData.length > 0 ? series.map((item) => (
+            <g key={`${item.key}-markers`}>
+              {safeData.map((point, index) => {
+                const value = item.getValue(point);
+                const x = getX(index);
+                const y = getY(value);
+
+                return (
+                  <circle
+                    key={`${item.key}-${point.date}`}
+                    cx={x}
+                    cy={y}
+                    r="3"
+                    fill={item.color}
+                    stroke="white"
+                    strokeWidth="1.5"
+                  />
+                );
+              })}
+            </g>
+          )) : null}
+
+          {safeData.map((point, index) => {
+            const shouldShowLabel =
+              index === 0 || index === safeData.length - 1 || index % xLabelInterval === 0;
+
+            return shouldShowLabel ? (
+              <text key={point.date} x={getX(index)} y={chartBottom + 30} textAnchor="middle" className="fill-slate-600 text-[12px]">
+                {point.label}
+              </text>
+            ) : null;
+          })}
+
+          {safeData.length > 0 ? series.map((item, seriesIndex) => (
+            <g key={`${item.key}-value-labels`}>
+              {safeData.map((point, index) => {
+                const value = item.getValue(point);
+                const x = getX(index);
+                const y = getY(value);
+                const labelY = getValueLabelY(y, seriesIndex);
+
+                return (
+                  <text
+                    key={`${item.key}-${point.date}`}
+                    x={x}
+                    y={labelY}
+                    textAnchor="middle"
+                    className="text-[11px] font-bold tabular-nums"
+                    fill={item.color}
+                    stroke="white"
+                    strokeWidth="4"
+                    paintOrder="stroke"
+                  >
+                    {formatQuantity(value)}
+                  </text>
+                );
+              })}
+            </g>
+          )) : null}
         </svg>
-        {tooltip ? (
-          <div
-            className={`pointer-events-none absolute z-10 -translate-x-[var(--tooltip-translate-x)] rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs shadow-lg ${
-              tooltip.placement === "top" ? "-translate-y-full" : "translate-y-0"
-            }`}
-            style={{
-              left: `${tooltip.x}%`,
-              top: `${tooltip.y}%`,
-              ["--tooltip-translate-x" as string]: getTooltipTranslateX(tooltip.x),
-            }}
-          >
-            <div className="flex items-center gap-2 font-semibold text-slate-900">
-              <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: tooltip.color }} />
-              <span>{tooltip.label}</span>
-            </div>
-            <p className="mt-1 text-slate-600">
-              {tooltip.seriesLabel}: <span className="font-semibold text-slate-900">{formatQuantity(tooltip.value)}</span>
-            </p>
-          </div>
-        ) : null}
       </div>
     </article>
   );
@@ -442,26 +426,6 @@ function formatDelta(value: number) {
   return `${value.toFixed(1)}%`;
 }
 
-function getTooltipTranslateX(x: number) {
-  if (x > 82) {
-    return "100%";
-  }
-
-  if (x < 18) {
-    return "0%";
-  }
-
-  return "50%";
-}
-
 function formatQuantity(value: number) {
-  return new Intl.NumberFormat("id-ID").format(Math.round(value));
-}
-
-function formatCompactQuantity(value: number) {
-  if (value >= 1000) {
-    return `${Math.round(value / 1000)}K`;
-  }
-
   return new Intl.NumberFormat("id-ID").format(Math.round(value));
 }
