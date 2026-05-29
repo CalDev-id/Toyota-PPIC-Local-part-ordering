@@ -81,8 +81,8 @@ export default function HomeDashboard({ data, errorMessage }: HomeDashboardProps
         </div>
       ) : null}
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-        {data.kpis.map((kpi) => (
+      <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+        {data.kpis.filter((kpi) => kpi.key !== "pending").map((kpi) => (
           <KpiCard key={kpi.key} kpi={kpi} />
         ))}
       </section>
@@ -99,19 +99,19 @@ export default function HomeDashboard({ data, errorMessage }: HomeDashboardProps
 
 function KpiCard({ kpi }: { kpi: HomeKpi }) {
   return (
-    <article className="h-full rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+    <article className="h-full min-h-[160px] rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-sm font-semibold text-slate-600">{kpi.label}</p>
-          <p className="mt-3 text-3xl font-bold leading-none text-slate-950 tabular-nums">
+          <p className="mt-4 text-4xl font-bold leading-none text-slate-950 tabular-nums">
             {formatQuantity(kpi.value)}
           </p>
         </div>
-        <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border ${kpiToneClassMap[kpi.tone]}`}>
+        <div className={`flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-2xl border ${kpiToneClassMap[kpi.tone]}`}>
           {kpiIconMap[kpi.key]}
         </div>
       </div>
-      <p className="mt-4 text-xs font-medium text-slate-500">{kpi.helper}</p>
+      <p className="mt-6 text-sm font-medium text-slate-500">{kpi.helper}</p>
     </article>
   );
 }
@@ -316,7 +316,7 @@ function PlanCoverageChart({ data }: { data: HomeDashboardData }) {
   const deliveryQty = data.totals.confirmedQty;
   const gapQty = Math.max(orderQty - deliveryQty, 0);
   const progress = orderQty > 0 ? Math.min((deliveryQty / orderQty) * 100, 100) : 0;
-  const progressLabel = `${Math.round(progress)}%`;
+  const progressLabel = formatCoveragePercent(progress, gapQty);
 
   return (
     <article className="h-full min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -327,7 +327,7 @@ function PlanCoverageChart({ data }: { data: HomeDashboardData }) {
         </div>
         <span
           className={`rounded-full px-2.5 py-1 text-xs font-medium ${
-            progress >= 100 ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"
+            gapQty <= 0 ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"
           }`}
         >
           {progressLabel}
@@ -392,4 +392,16 @@ function formatCompactQuantity(value: number) {
   }
 
   return formatQuantity(value);
+}
+
+function formatCoveragePercent(value: number, gapQty: number) {
+  if (gapQty <= 0 && value >= 100) {
+    return "100%";
+  }
+
+  if (value >= 99 && value < 100) {
+    return `${Math.floor(value * 10) / 10}%`;
+  }
+
+  return `${Math.floor(value)}%`;
 }
