@@ -29,6 +29,7 @@ export type ReceivingQueueRow = {
   orderId: string;
   kodeOrder: string;
   tanggalOrder: string;
+  time: string;
   shift: string;
   dayNight: string;
   truckType: string;
@@ -128,6 +129,7 @@ export async function getReceivingPageData(filter: OrderingFilter): Promise<Rece
       orderId: header.orderId,
       kodeOrder: header.kodeOrder,
       tanggalOrder: formatDateLabel(header.tanggalOrder),
+      time: formatTimeLabel(header.waktuOrder),
       shift: normalizeText(header.shift),
       dayNight: normalizeText(header.dayNight),
       truckType: normalizeText(header.truckType),
@@ -209,6 +211,15 @@ function formatDateLabel(value: Date) {
   const month = MONTH_NAMES_SHORT[value.getUTCMonth()];
   const year = value.getUTCFullYear();
   return `${day} ${month} ${year}`;
+}
+
+function formatTimeLabel(value: Date): string {
+  return new Intl.DateTimeFormat("id-ID", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: "Asia/Jakarta",
+  }).format(value);
 }
 
 const MONTH_NAMES_SHORT = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];

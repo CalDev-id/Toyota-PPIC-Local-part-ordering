@@ -16,8 +16,11 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Toyota Dashboard",
-  description: "Toyota dummy dashboard with collapsible sidebar",
+  title: "Asoi-rdc",
+  description: "Asoi-rdc dashboard",
+  icons: {
+    icon: "/asoi.ico",
+  },
 };
 
 export default async function RootLayout({
@@ -28,9 +31,10 @@ export default async function RootLayout({
   const session = await getServerSession(authOptions);
 
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        suppressHydrationWarning
       >
         <AuthProvider session={session}>{children}</AuthProvider>
       </body>

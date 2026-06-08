@@ -1,5 +1,7 @@
+import { authOptions } from '@/auth'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { getServerSession } from 'next-auth'
 
 const ALLOWED_FIELDS = ['name', 'qty', 'status', 'price'] as const
 type AllowedField = (typeof ALLOWED_FIELDS)[number]
@@ -14,6 +16,16 @@ export async function PATCH(
   context: { params: Promise<{ id: string }> }
 ) {
   try {
+    const session = await getServerSession(authOptions)
+
+    if (!session?.user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    if (session.user.role !== 'ADMIN') {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
     const { id: idParam } = await context.params
     const id = Number(idParam)
 

@@ -22,7 +22,8 @@ export default function LoginForm({ callbackUrl }: LoginFormProps) {
     const result = await signIn("credentials", {
       email,
       password,
-      redirect: false
+      redirect: false,
+      callbackUrl: redirectTo
     })
 
     if (result?.error) {
@@ -31,7 +32,7 @@ export default function LoginForm({ callbackUrl }: LoginFormProps) {
       return
     }
 
-    window.location.href = redirectTo
+    window.location.replace(redirectTo)
   }
 
   return (

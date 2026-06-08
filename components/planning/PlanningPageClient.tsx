@@ -1,6 +1,7 @@
 "use client";
 
 import { getDefaultDayNightByTime } from "@/lib/day-night";
+import Image from "next/image";
 import type { FormEvent } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -34,7 +35,8 @@ type ToastState = {
 } | null;
 
 const shiftOptions = ["RED", "WHITE"];
-const PAGE_SIZE = 7;
+const PAGE_SIZE = 10;
+const MAX_VISIBLE_PAGES = 5;
 
 export default function PlanningPageClient() {
   const [records, setRecords] = useState<PlanningRecord[]>([]);
@@ -45,9 +47,6 @@ export default function PlanningPageClient() {
   const [form, setForm] = useState<PlanningFormValues>(() => buildEmptyForm(getTodayInputValue()));
   const [editingId, setEditingId] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
-  const [editingMeta, setEditingMeta] = useState<Pick<PlanningRecord, "planId" | "inputBy" | "inputAt"> | null>(
-    null
-  );
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -157,11 +156,6 @@ export default function PlanningPageClient() {
 
   function handleEdit(record: PlanningRecord) {
     setEditingId(record.planId);
-    setEditingMeta({
-      planId: record.planId,
-      inputBy: record.inputBy,
-      inputAt: record.inputAt,
-    });
     setForm({
       tanggal: record.tanggal,
       shift: record.shift,
@@ -186,7 +180,6 @@ export default function PlanningPageClient() {
 
   function resetForm(nextDate = getTodayInputValue()) {
     setEditingId(null);
-    setEditingMeta(null);
     setForm(buildEmptyForm(nextDate));
   }
 
@@ -223,32 +216,51 @@ export default function PlanningPageClient() {
     (safeCurrentPage - 1) * PAGE_SIZE,
     safeCurrentPage * PAGE_SIZE
   );
+  const visiblePages = getVisiblePages(safeCurrentPage, totalPages);
   const latestRecord = filteredSummaryRecords[0] ?? null;
   const summaryCards = [
     {
-      label: "CB 1TR",
-      stock: latestRecord ? latestRecord.stockAwalJunbikiCb1tr + latestRecord.stockAwalEmergencyCb1tr : 0,
-      plan: latestRecord?.planProdCb1tr ?? 0,
+      name: "Cylinder Block",
+      image: "/image/cb.png",
+      variants: [
+        {
+          label: "1TR",
+          stock: latestRecord ? latestRecord.stockAwalJunbikiCb1tr + latestRecord.stockAwalEmergencyCb1tr : 0,
+          plan: latestRecord?.planProdCb1tr ?? 0,
+        },
+        {
+          label: "2TR",
+          stock: latestRecord ? latestRecord.stockAwalJunbikiCb2tr + latestRecord.stockAwalEmergencyCb2tr : 0,
+          plan: latestRecord?.planProdCb2tr ?? 0,
+        },
+      ],
     },
     {
-      label: "CB 2TR",
-      stock: latestRecord ? latestRecord.stockAwalJunbikiCb2tr + latestRecord.stockAwalEmergencyCb2tr : 0,
-      plan: latestRecord?.planProdCb2tr ?? 0,
+      name: "Camshaft",
+      image: "/image/cam.png",
+      variants: [
+        {
+          label: "1TR",
+          stock: latestRecord?.stockAwalEmergencyCam01 ?? 0,
+          plan: latestRecord?.planProdCam01 ?? 0,
+        },
+        {
+          label: "2TR",
+          stock: latestRecord?.stockAwalEmergencyCam02 ?? 0,
+          plan: latestRecord?.planProdCam02 ?? 0,
+        },
+      ],
     },
     {
-      label: "CR 1TR",
-      stock: latestRecord?.stockAwalEmergencyCr1tr ?? 0,
-      plan: latestRecord?.planProdCr1tr ?? 0,
-    },
-    {
-      label: "Cam 01",
-      stock: latestRecord?.stockAwalEmergencyCam01 ?? 0,
-      plan: latestRecord?.planProdCam01 ?? 0,
-    },
-    {
-      label: "Cam 02",
-      stock: latestRecord?.stockAwalEmergencyCam02 ?? 0,
-      plan: latestRecord?.planProdCam02 ?? 0,
+      name: "Crankshaft",
+      image: "/image/crank.png",
+      variants: [
+        {
+          label: "1TR",
+          stock: latestRecord?.stockAwalEmergencyCr1tr ?? 0,
+          plan: latestRecord?.planProdCr1tr ?? 0,
+        },
+      ],
     },
   ];
 
@@ -314,21 +326,66 @@ export default function PlanningPageClient() {
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+      <div className="grid gap-5 lg:grid-cols-2 2xl:grid-cols-3">
         {summaryCards.map((item) => (
           <article
-            key={item.label}
-            className="rounded-2xl border border-slate-200 bg-white/95 p-5 shadow-sm"
+            key={item.name}
+            className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
           >
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{item.label}</p>
-            <div className="mt-4 space-y-3">
-              <MetricRow label="Stock Awal" value={item.stock} />
-              <MetricRow label="Plan" value={item.plan} />
-              <MetricRow
-                label="Plan Order"
-                value={Math.max(item.plan - item.stock, 0)}
-                valueClassName="text-emerald-600"
-              />
+            <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
+              <div className="flex h-32 w-full shrink-0 items-center justify-center rounded-2xl border border-slate-100 bg-slate-50 p-4 sm:w-36">
+                <Image
+                  src={item.image}
+                  alt={item.name}
+                  width={220}
+                  height={160}
+                  className="max-h-24 w-auto object-contain mix-blend-multiply"
+                  priority={item.name === "Cylinder Block"}
+                />
+              </div>
+
+              <div className="min-w-0 flex-1">
+                <h2 className="mt-2 text-xl font-bold leading-tight text-slate-950">{item.name}</h2>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {item.variants.map((variant) => (
+                    <span
+                      key={variant.label}
+                      className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-bold text-slate-600"
+                    >
+                      {variant.label}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-5 overflow-x-auto">
+              <div className="min-w-[24rem] overflow-hidden rounded-2xl border border-slate-200">
+                <table className="w-full table-fixed text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-200 bg-slate-50 text-slate-600">
+                      <th className="w-32 px-4 py-3 text-left text-xs font-bold uppercase tracking-[0.14em]">Variant</th>
+                      {item.variants.map((variant) => (
+                        <th key={variant.label} className="px-4 py-3 text-center text-sm font-bold text-slate-950">
+                          {variant.label}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    <PlanningMetricTableRow label="Stock Awal" variants={item.variants} valueKey="stock" />
+                    <PlanningMetricTableRow label="Plan" variants={item.variants} valueKey="plan" />
+                    <tr>
+                      <th className="px-4 py-3 text-left font-semibold text-slate-500">Plan Order</th>
+                      {item.variants.map((variant) => (
+                        <td key={variant.label} className="px-4 py-3 text-center font-bold text-emerald-600 tabular-nums">
+                          {formatNumber(Math.max(variant.plan - variant.stock, 0))}
+                        </td>
+                      ))}
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
             </div>
           </article>
         ))}
@@ -346,46 +403,53 @@ export default function PlanningPageClient() {
         ) : (
           <>
             <div className="overflow-x-auto">
-              <table className="min-w-full border-collapse text-sm">
-                <thead className="bg-slate-100/90 text-slate-700">
+              <table className="min-w-full border-separate border-spacing-0 text-sm">
+                <thead className="text-slate-700">
                   <tr>
-                    <TableHead label="Tanggal" className="min-w-[140px]" />
-                    <TableHead label="Shift" />
-                    <TableHead label="Day/Night" />
-                    <TableHead label="StawCB1TRjun" />
-                    <TableHead label="StawCB2TRjun" />
-                    <TableHead label="StawCB1TREm" />
-                    <TableHead label="StawCB2TREm" />
-                    <TableHead label="StawCR1TR" />
-                    <TableHead label="StawCA01" />
-                    <TableHead label="StawCA02" />
-                    <TableHead label="Plan_Prod_CR1TR" />
-                    <TableHead label="Plan_Prod_CB1TR" />
-                    <TableHead label="Plan_Prod_CB2TR" />
-                    <TableHead label="Plan_Prod_Cam01" />
-                    <TableHead label="Plan_Prod_Cam02" />
-                    <TableHead label="Aksi" />
+                    <GroupedTableHead label="Informasi" colSpan={3} className="bg-slate-100 text-slate-700" />
+                    <GroupedTableHead label="Stock Awal Junbiki" colSpan={2} className="bg-emerald-50 text-emerald-900" />
+                    <GroupedTableHead label="Stock Awal Emergency" colSpan={5} className="bg-sky-50 text-sky-900" />
+                    <GroupedTableHead label="Plan Produksi" colSpan={5} className="bg-amber-50 text-amber-900" />
+                    <GroupedTableHead label="Action" colSpan={1} className="bg-slate-900 text-white" />
+                  </tr>
+                  <tr>
+                    <TableHead label="Tanggal" className="min-w-[140px] bg-white" />
+                    <TableHead label="Shift" className="bg-white" />
+                    <TableHead label="Day/Night" className="bg-white" />
+                    <TableHead label="CB 1TR" className="bg-emerald-50/60 text-right" />
+                    <TableHead label="CB 2TR" className="bg-emerald-50/60 text-right" />
+                    <TableHead label="CB 1TR" className="bg-sky-50/70 text-right" />
+                    <TableHead label="CB 2TR" className="bg-sky-50/70 text-right" />
+                    <TableHead label="CR 1TR" className="bg-sky-50/70 text-right" />
+                    <TableHead label="Cam 01" className="bg-sky-50/70 text-right" />
+                    <TableHead label="Cam 02" className="bg-sky-50/70 text-right" />
+                    <TableHead label="CB 1TR" className="bg-amber-50/70 text-right" />
+                    <TableHead label="CB 2TR" className="bg-amber-50/70 text-right" />
+                    <TableHead label="CR 1TR" className="bg-amber-50/70 text-right" />
+                    <TableHead label="Cam 01" className="bg-amber-50/70 text-right" />
+                    <TableHead label="Cam 02" className="bg-amber-50/70 text-right" />
+                    <TableHead label="Aksi" className="bg-slate-100" />
                   </tr>
                 </thead>
                 <tbody>
                   {paginatedRecords.map((record) => (
-                    <tr key={record.planId} className="align-top odd:bg-white even:bg-slate-50/60">
-                      <TableCell value={record.tanggal} className="min-w-[140px] whitespace-nowrap" />
-                      <TableCell value={record.shift} />
-                      <TableCell value={record.dayNight || "-"} />
-                      <TableCell value={formatNumber(record.stockAwalJunbikiCb1tr)} />
-                      <TableCell value={formatNumber(record.stockAwalJunbikiCb2tr)} />
-                      <TableCell value={formatNumber(record.stockAwalEmergencyCb1tr)} />
-                      <TableCell value={formatNumber(record.stockAwalEmergencyCb2tr)} />
-                      <TableCell value={formatNumber(record.stockAwalEmergencyCr1tr)} />
-                      <TableCell value={formatNumber(record.stockAwalEmergencyCam01)} />
-                      <TableCell value={formatNumber(record.stockAwalEmergencyCam02)} />
-                      <TableCell value={formatNumber(record.planProdCr1tr)} />
-                      <TableCell value={formatNumber(record.planProdCb1tr)} />
-                      <TableCell value={formatNumber(record.planProdCb2tr)} />
-                      <TableCell value={formatNumber(record.planProdCam01)} />
-                      <TableCell value={formatNumber(record.planProdCam02)} />
-                      <td className="border-b border-slate-200 px-4 py-3 whitespace-nowrap">
+                    <tr key={record.planId} className="align-top">
+                      <TableCell value={record.tanggal} className="min-w-[140px] whitespace-nowrap bg-white font-medium text-slate-900" />
+                      <TableCell value={record.shift} className="bg-white" />
+                      <TableCell value={record.dayNight || "-"} className="bg-white" />
+                      <TableCell value={formatNumber(record.stockAwalJunbikiCb1tr)} className="bg-emerald-50/40 text-right tabular-nums" />
+                      <TableCell value={formatNumber(record.stockAwalJunbikiCb2tr)} className="bg-emerald-50/40 text-right tabular-nums" />
+                      <TableCell value={formatNumber(record.stockAwalEmergencyCb1tr)} className="bg-sky-50/50 text-right tabular-nums" />
+                      <TableCell value={formatNumber(record.stockAwalEmergencyCb2tr)} className="bg-sky-50/50 text-right tabular-nums" />
+                      <TableCell value={formatNumber(record.stockAwalEmergencyCr1tr)} className="bg-sky-50/50 text-right tabular-nums" />
+                      <TableCell value={formatNumber(record.stockAwalEmergencyCam01)} className="bg-sky-50/50 text-right tabular-nums" />
+                      <TableCell value={formatNumber(record.stockAwalEmergencyCam02)} className="bg-sky-50/50 text-right tabular-nums" />
+                      <TableCell value={formatNumber(record.planProdCb1tr)} className="bg-amber-50/50 text-right tabular-nums" />
+                      <TableCell value={formatNumber(record.planProdCb2tr)} className="bg-amber-50/50 text-right tabular-nums" />
+                      <TableCell value={formatNumber(record.planProdCr1tr)} className="bg-amber-50/50 text-right tabular-nums" />
+                      <TableCell value={formatNumber(record.planProdCam01)} className="bg-amber-50/50 text-right tabular-nums" />
+                      <TableCell value={formatNumber(record.planProdCam02)} className="bg-amber-50/50 text-right tabular-nums" />
+                      <td className="border-b border-r border-slate-200 bg-slate-50/70 px-4 py-3 whitespace-nowrap">
                         <div className="flex gap-2">
                           <button
                             type="button"
@@ -422,7 +486,7 @@ export default function PlanningPageClient() {
                 >
                   Prev
                 </button>
-                {Array.from({ length: totalPages }, (_, index) => index + 1).map((page) => (
+                {visiblePages.map((page) => (
                   <button
                     key={page}
                     type="button"
@@ -488,14 +552,6 @@ export default function PlanningPageClient() {
             </div>
 
             <div className="space-y-5 px-6 py-5">
-              {editingMeta ? (
-                <div className="grid gap-2 rounded-2xl border border-slate-200 bg-slate-50/70 p-4 text-sm text-slate-600 md:grid-cols-3">
-                  <ReadOnlyMeta label="Plan ID" value={editingMeta.planId} />
-                  <ReadOnlyMeta label="Input By" value={editingMeta.inputBy || "-"} />
-                  <ReadOnlyMeta label="Input At" value={formatDateTime(editingMeta.inputAt)} />
-                </div>
-              ) : null}
-
               <form onSubmit={handleSubmit} className="space-y-5">
                 <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_220px]">
                   <div className="grid gap-4 md:grid-cols-2">
@@ -579,7 +635,7 @@ export default function PlanningPageClient() {
                   </button>
                   <button
                     type="button"
-                    onClick={resetForm}
+                    onClick={() => resetForm()}
                     className="inline-flex h-11 items-center justify-center rounded-xl border border-slate-300 px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
                   >
                     Reset
@@ -664,14 +720,6 @@ function SelectField({
   );
 }
 
-function ReadOnlyMeta({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <span className="font-medium text-slate-900">{label}:</span> {value}
-    </div>
-  );
-}
-
 function TableHead({
   label,
   className,
@@ -680,7 +728,26 @@ function TableHead({
   className?: string;
 }) {
   return (
-    <th className={`border-b border-slate-200 px-4 py-3 text-left font-semibold whitespace-nowrap ${className ?? ""}`}>
+    <th className={`border-b border-r border-slate-200 px-4 py-3 text-left font-semibold whitespace-nowrap ${className ?? ""}`}>
+      {label}
+    </th>
+  );
+}
+
+function GroupedTableHead({
+  label,
+  colSpan,
+  className,
+}: {
+  label: string;
+  colSpan: number;
+  className?: string;
+}) {
+  return (
+    <th
+      colSpan={colSpan}
+      className={`border-b border-r border-slate-200 px-4 py-3 text-center text-xs font-bold uppercase tracking-[0.12em] whitespace-nowrap ${className ?? ""}`}
+    >
       {label}
     </th>
   );
@@ -693,23 +760,7 @@ function TableCell({
   value: string;
   className?: string;
 }) {
-  return <td className={`border-b border-slate-200 px-4 py-3 text-slate-700 ${className ?? ""}`}>{value}</td>;
-}
-
-function formatDateTime(value: string) {
-  if (!value) {
-    return "-";
-  }
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-
-  return new Intl.DateTimeFormat("id-ID", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(date);
+  return <td className={`border-b border-r border-slate-200 px-4 py-3 text-slate-700 ${className ?? ""}`}>{value}</td>;
 }
 
 function formatNumber(value: number) {
@@ -718,6 +769,17 @@ function formatNumber(value: number) {
 
 function getTodayInputValue() {
   return new Date().toISOString().slice(0, 10);
+}
+
+function getVisiblePages(currentPage: number, totalPages: number) {
+  const pageCount = Math.min(totalPages, MAX_VISIBLE_PAGES);
+  const halfWindow = Math.floor(pageCount / 2);
+  let start = Math.max(1, currentPage - halfWindow);
+  const maxStart = Math.max(1, totalPages - pageCount + 1);
+
+  start = Math.min(start, maxStart);
+
+  return Array.from({ length: pageCount }, (_, index) => start + index);
 }
 
 function buildEmptyForm(tanggal = getTodayInputValue()): PlanningFormValues {
@@ -741,19 +803,23 @@ function buildEmptyForm(tanggal = getTodayInputValue()): PlanningFormValues {
   };
 }
 
-function MetricRow({
+function PlanningMetricTableRow({
   label,
-  value,
-  valueClassName,
+  variants,
+  valueKey,
 }: {
   label: string;
-  value: number;
-  valueClassName?: string;
+  variants: Array<{ label: string; stock: number; plan: number }>;
+  valueKey: "stock" | "plan";
 }) {
   return (
-    <div className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-3">
-      <p className="text-sm font-medium text-slate-600">{label}</p>
-      <p className={`text-lg font-bold text-slate-900 ${valueClassName ?? ""}`}>{formatNumber(value)}</p>
-    </div>
+    <tr>
+      <th className="px-4 py-3 text-left font-semibold text-slate-500">{label}</th>
+      {variants.map((variant) => (
+        <td key={variant.label} className="px-4 py-3 text-center font-semibold text-slate-900 tabular-nums">
+          {formatNumber(variant[valueKey])}
+        </td>
+      ))}
+    </tr>
   );
 }

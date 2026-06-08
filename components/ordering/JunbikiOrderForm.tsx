@@ -89,6 +89,7 @@ type JunbikiOrderFormProps = {
   initialKodeOrder?: string;
   onCancel?: () => void;
   onSuccess?: (kodeOrder: string) => void;
+  hideHeaderTitle?: boolean;
 };
 
 const SHIFT_OPTIONS: Shift[] = ["RED", "WHITE"];
@@ -102,11 +103,11 @@ const SECTION_META: Record<
 > = {
   CB_1TR: {
     title: "CB 1TR",
-    accentClassName: "from-emerald-500/20 via-emerald-500/10 to-white",
+    accentClassName: "from-amber-100/75 via-amber-50/45 to-white",
   },
   CB_2TR: {
     title: "CB 2TR",
-    accentClassName: "from-sky-500/20 via-sky-500/10 to-white",
+    accentClassName: "from-sky-100/75 via-sky-50/45 to-white",
   },
 };
 
@@ -138,6 +139,7 @@ export default function JunbikiOrderForm({
   initialKodeOrder,
   onCancel,
   onSuccess,
+  hideHeaderTitle = false,
 }: JunbikiOrderFormProps) {
   const [header, setHeader] = useState<JunbikiOrderHeader>(() => buildInitialHeader(initialValues));
   const [shellStatuses, setShellStatuses] = useState<ShellStatusMap>(() => buildInitialShellStatuses(initialValues));
@@ -393,6 +395,7 @@ export default function JunbikiOrderForm({
           onChange={updateHeader}
           onClose={onCancel}
           isEditing={isEditing}
+          hideTitle={hideHeaderTitle}
         />
 
         <div className="grid gap-5 xl:grid-cols-[minmax(280px,0.75fr)_minmax(0,1.65fr)]">
@@ -460,17 +463,21 @@ function OrderFormHeader({
   onChange,
   onClose,
   isEditing = false,
+  hideTitle = false,
 }: {
   header: JunbikiOrderHeader;
   ritaseProgress: RitaseProgressState;
   onChange: <Key extends keyof JunbikiOrderHeader>(key: Key, value: JunbikiOrderHeader[Key]) => void;
   onClose?: () => void;
   isEditing?: boolean;
+  hideTitle?: boolean;
 }) {
   return (
     <section className="pb-2">
       <div className="flex items-start justify-between gap-4">
-        <h2 className="text-xl font-bold text-slate-900">{isEditing ? "Edit Order Junbiki" : "Order Junbiki"}</h2>
+        {hideTitle ? null : (
+          <h2 className="text-xl font-bold text-slate-900">{isEditing ? "Edit Order Junbiki" : "Order Junbiki"}</h2>
+        )}
         {onClose ? (
           <button
             type="button"
@@ -482,7 +489,11 @@ function OrderFormHeader({
         ) : null}
       </div>
 
-      <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-[minmax(220px,1.4fr)_minmax(150px,1fr)_minmax(150px,1fr)_minmax(150px,1fr)_max-content] xl:items-end">
+      <div
+        className={`grid gap-4 md:grid-cols-2 xl:grid-cols-[minmax(220px,1.4fr)_minmax(150px,1fr)_minmax(150px,1fr)_minmax(150px,1fr)_max-content] xl:items-end ${
+          hideTitle ? "mt-0" : "mt-5"
+        }`}
+      >
         <div>
           <DateField label="Tanggal Order" value={header.tanggal_order} onChange={(value) => onChange("tanggal_order", value)} />
         </div>
@@ -618,9 +629,9 @@ function ShellGridSection({
       </div>
 
       <div className="mt-5 flex flex-wrap gap-2 text-xs font-medium">
-        <LegendBadge label="Idle" className="border-slate-200 bg-slate-100 text-slate-600" />
-        <LegendBadge label="Active / OK" className="border-emerald-200 bg-emerald-50 text-emerald-700" />
-        <LegendBadge label="Blocked / Reject" className="border-rose-200 bg-rose-50 text-rose-700" />
+        <LegendBadge label="Idle" className="border-slate-300 bg-slate-200 text-slate-700" />
+        <LegendBadge label="Active / OK" className="border-emerald-300 bg-emerald-100 text-emerald-900" />
+        <LegendBadge label="Blocked / Reject" className="border-rose-300 bg-rose-100 text-rose-900" />
       </div>
     </section>
   );
@@ -941,14 +952,14 @@ function splitRatioIntoQty(ratioCb1tr: number, ratioCb2tr: number) {
 // ini shell junbiki
 function getShellStatusClassName(status: ShellStatus) {
   if (status === "active") {
-    return "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100";
+    return "border-emerald-300 bg-emerald-100 text-emerald-900 hover:bg-emerald-200";
   }
 
   if (status === "blocked") {
-    return "border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100";
+    return "border-rose-300 bg-rose-100 text-rose-900 hover:bg-rose-200";
   }
 
-  return "border-slate-200 bg-slate-100 text-slate-700 hover:bg-slate-200";
+  return "border-slate-300 bg-slate-200 text-slate-800 hover:bg-slate-300";
   // return "border-slate-200 bg-slate-100 text-slate-700 hover:bg-slate-200";
 }
 

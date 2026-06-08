@@ -6,6 +6,7 @@ import type {
   OrderingFilterOptions,
   OrderReportRow,
 } from "@/lib/order-report";
+import type { AppRole } from "@/lib/roles";
 import JunbikiOrderForm from "@/components/ordering/JunbikiOrderForm";
 import PalletOrderForm from "@/components/ordering/PalletOrderForm";
 import AutoSubmitReportFilters from "@/components/shared/AutoSubmitReportFilters";
@@ -18,6 +19,7 @@ type OrderingReportProps = {
   selectedFilter: OrderingFilter;
   filterOptions: OrderingFilterOptions;
   errorMessage?: string | null;
+  userRole: AppRole;
 };
 
 type ToastState = {
@@ -85,42 +87,59 @@ type GapFormItem = {
   gapRequestQty: number;
 };
 
+type OrderColumnGroupKey = "identity" | "cb1tr" | "cb2tr" | "camNo01" | "camNo02" | "cr1tr" | "remarks" | "actions";
+
 const tableColumns: Array<{
   key:
     | keyof OrderReportRow
     | "cb1trRequest"
     | "cb1trDelivery"
+    | "cb1trReceived"
     | "cb2trRequest"
     | "cb2trDelivery"
+    | "cb2trReceived"
     | "camNo01Request"
     | "camNo01Delivery"
+    | "camNo01Received"
     | "camNo02Request"
     | "camNo02Delivery"
+    | "camNo02Received"
     | "cr1trRequest"
     | "cr1trDelivery"
+    | "cr1trReceived"
+    | "remarksOrdering"
+    | "remarksDelivery"
+    | "remarksReceiving"
     | "actions";
   label: string;
   align?: "left" | "right";
+  group: OrderColumnGroupKey;
 }> = [
-  { key: "date", label: "Tanggal" },
-  { key: "time", label: "Waktu Order" },
-  { key: "code", label: "Kode" },
-  { key: "truckType", label: "Truck Type" },
-  { key: "ritaseRequest", label: "Ritase", align: "right" },
-  { key: "cb1trRequest", label: "Req CB 1TR", align: "right" },
-  { key: "cb1trDelivery", label: "Delv CB 1TR", align: "right" },
-  { key: "cb2trRequest", label: "Req CB 2TR", align: "right" },
-  { key: "cb2trDelivery", label: "Delv CB 2TR", align: "right" },
-  { key: "camNo01Request", label: "Req CA 01", align: "right" },
-  { key: "camNo01Delivery", label: "Delv CA 01", align: "right" },
-  { key: "camNo02Request", label: "Req CA 02", align: "right" },
-  { key: "camNo02Delivery", label: "Delv CA 02", align: "right" },
-  { key: "cr1trRequest", label: "Req CR 1TR", align: "right" },
-  { key: "cr1trDelivery", label: "Delv CR 1TR", align: "right" },
-  { key: "remarksJunbikiS2", label: "Remarks Junbiki S2" },
-  { key: "remarksPalletS2", label: "Remarks Pallet S2" },
-  { key: "remarksGapS2", label: "Remarks Gap S2" },
-  { key: "actions", label: "Action" },
+  { key: "date", label: "Tanggal", group: "identity" },
+  { key: "time", label: "Waktu", group: "identity" },
+  { key: "code", label: "Kode", group: "identity" },
+  { key: "truckType", label: "Truck Type", group: "identity" },
+  { key: "ritaseRequest", label: "Ritase", align: "right", group: "identity" },
+  { key: "statusOrder", label: "Status", group: "identity" },
+  { key: "cb1trRequest", label: "Request", align: "right", group: "cb1tr" },
+  { key: "cb1trDelivery", label: "Delivery", align: "right", group: "cb1tr" },
+  { key: "cb1trReceived", label: "Received", align: "right", group: "cb1tr" },
+  { key: "cb2trRequest", label: "Request", align: "right", group: "cb2tr" },
+  { key: "cb2trDelivery", label: "Delivery", align: "right", group: "cb2tr" },
+  { key: "cb2trReceived", label: "Received", align: "right", group: "cb2tr" },
+  { key: "camNo01Request", label: "Request", align: "right", group: "camNo01" },
+  { key: "camNo01Delivery", label: "Delivery", align: "right", group: "camNo01" },
+  { key: "camNo01Received", label: "Received", align: "right", group: "camNo01" },
+  { key: "camNo02Request", label: "Request", align: "right", group: "camNo02" },
+  { key: "camNo02Delivery", label: "Delivery", align: "right", group: "camNo02" },
+  { key: "camNo02Received", label: "Received", align: "right", group: "camNo02" },
+  { key: "cr1trRequest", label: "Request", align: "right", group: "cr1tr" },
+  { key: "cr1trDelivery", label: "Delivery", align: "right", group: "cr1tr" },
+  { key: "cr1trReceived", label: "Received", align: "right", group: "cr1tr" },
+  { key: "remarksOrdering", label: "Ordering", group: "remarks" },
+  { key: "remarksDelivery", label: "Delivery", group: "remarks" },
+  { key: "remarksReceiving", label: "Receiving", group: "remarks" },
+  { key: "actions", label: "Action", group: "actions" },
 ];
 
 export default function OrderingReport({
@@ -129,6 +148,7 @@ export default function OrderingReport({
   selectedFilter,
   filterOptions,
   errorMessage,
+  userRole,
 }: OrderingReportProps) {
   const router = useRouter();
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -138,9 +158,6 @@ export default function OrderingReport({
   const [toast, setToast] = useState<ToastState>(null);
   const [activeModal, setActiveModal] = useState<"junbiki" | "pallet" | "gap" | null>(null);
   const gapItems = buildGapItems(summaries);
-  const activeRows = rows.filter((row) => row.statusOrder.toLowerCase() === "submitted");
-  const deliveryRows = rows.filter((row) => row.statusOrder.toLowerCase() === "confirmed");
-  const finishedRows = rows.filter((row) => row.statusOrder.toLowerCase() === "checked");
 
   async function handleDelete(orderId: string) {
     try {
@@ -273,39 +290,15 @@ export default function OrderingReport({
       </div>
 
       <OrderQueueTable
-        title="Active Order"
-        description={`Order dengan status Submitted untuk ${formatFilterLabel(selectedFilter)}.`}
-        rows={activeRows}
+        title="Order List"
+        description={`Daftar order untuk ${formatFilterLabel(selectedFilter)}.`}
+        rows={rows}
         deletingId={deletingId}
         pendingDeleteId={pendingDelete?.orderId ?? null}
         onRequestDelete={setPendingDelete}
         onEdit={handleEdit}
         loadingEditId={loadingEditId}
-        showDelivery={false}
-      />
-
-      <OrderQueueTable
-        title="Delivery Order"
-        description={`Order dengan status Confirmed untuk ${formatFilterLabel(selectedFilter)}.`}
-        rows={deliveryRows}
-        deletingId={deletingId}
-        pendingDeleteId={pendingDelete?.orderId ?? null}
-        onRequestDelete={setPendingDelete}
-        onEdit={handleEdit}
-        loadingEditId={loadingEditId}
-        showDelivery
-      />
-
-      <OrderQueueTable
-        title="Finish Order"
-        description={`Order dengan status Checked untuk ${formatFilterLabel(selectedFilter)}.`}
-        rows={finishedRows}
-        deletingId={deletingId}
-        pendingDeleteId={pendingDelete?.orderId ?? null}
-        onRequestDelete={setPendingDelete}
-        onEdit={handleEdit}
-        loadingEditId={loadingEditId}
-        showDelivery
+        userRole={userRole}
       />
 
       {toast ? (
@@ -464,7 +457,7 @@ export default function OrderingReport({
   );
 }
 
-function OrderingModal({
+export function OrderingModal({
   title,
   children,
   onClose,
@@ -507,7 +500,7 @@ function OrderingModal({
   );
 }
 
-function RequestGapForm({
+export function RequestGapForm({
   orderId,
   initialKodeOrder,
   selectedDate,
@@ -762,7 +755,7 @@ function OrderQueueTable({
   onRequestDelete,
   onEdit,
   loadingEditId,
-  showDelivery,
+  userRole,
 }: {
   title: string;
   description: string;
@@ -772,7 +765,7 @@ function OrderQueueTable({
   onRequestDelete: (row: OrderReportRow | null) => void;
   onEdit: (row: OrderReportRow) => void;
   loadingEditId: string | null;
-  showDelivery: boolean;
+  userRole: AppRole;
 }) {
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white/95 shadow-sm">
@@ -783,72 +776,86 @@ function OrderQueueTable({
 
       {rows.length === 0 ? (
         <div className="px-5 py-10 text-center text-sm text-slate-500">
-          Tidak ada data order yang bisa ditampilkan pada section ini.
+          Tidak ada order pada filter ini.
         </div>
       ) : (
         <div className="overflow-x-auto">
-          <table className="min-w-full border-collapse text-sm">
-            <thead className="bg-slate-100/90 text-slate-700">
+          <table className="min-w-full border-separate border-spacing-0 text-sm">
+            <thead className="text-slate-700">
               <tr>
-                {tableColumns
-                  .filter((column) => showDelivery || !String(column.key).toLowerCase().includes("delivery"))
-                  .map((column) => (
-                    <th
-                      key={column.key}
-                      className={`border-b border-slate-200 px-4 py-3 font-semibold whitespace-nowrap ${
-                        column.align === "right" ? "text-right" : "text-left"
-                      }`}
-                    >
-                      {column.label}
-                    </th>
-                  ))}
+                {buildOrderColumnGroups().map((group) => (
+                  <th
+                    key={group.key}
+                    colSpan={group.colSpan}
+                    className={`border-b border-r border-slate-200 px-4 py-3 text-center text-xs font-bold uppercase tracking-[0.12em] whitespace-nowrap ${group.className}`}
+                  >
+                    {group.label}
+                  </th>
+                ))}
+              </tr>
+              <tr>
+                {tableColumns.map((column) => (
+                  <th
+                    key={column.key}
+                    className={`border-b border-r border-slate-200 px-4 py-3 font-semibold whitespace-nowrap ${getOrderGroupCellClassName(column.group)} ${
+                      column.align === "right" ? "text-right" : "text-left"
+                    }`}
+                  >
+                    {column.label}
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>
               {rows.map((row, index) => (
-                <tr
-                  key={`${row.code}-${row.rawDate}-${row.time}-${index}`}
-                  className="align-top odd:bg-white even:bg-slate-50/60"
-                >
-                  <td className="border-b border-slate-200 px-4 py-3 whitespace-nowrap text-slate-700">{row.date}</td>
-                  <td className="border-b border-slate-200 px-4 py-3 whitespace-nowrap text-slate-700">{row.time}</td>
-                  <td className="border-b border-slate-200 px-4 py-3 whitespace-nowrap font-medium text-slate-900">{row.code}</td>
-                  <td className="border-b border-slate-200 px-4 py-3 whitespace-nowrap text-slate-700">{row.truckType}</td>
-                  <NumericCell value={row.ritaseRequest} />
-                  <NumericCell value={getOrderRequestQty(row, "cb1tr")} />
-                  {showDelivery ? <NumericCell value={row.cb1tr.delivery} /> : null}
-                  <NumericCell value={getOrderRequestQty(row, "cb2tr")} />
-                  {showDelivery ? <NumericCell value={row.cb2tr.delivery} /> : null}
-                  <NumericCell value={getOrderRequestQty(row, "camNo01")} />
-                  {showDelivery ? <NumericCell value={row.camNo01.delivery} /> : null}
-                  <NumericCell value={getOrderRequestQty(row, "camNo02")} />
-                  {showDelivery ? <NumericCell value={row.camNo02.delivery} /> : null}
-                  <NumericCell value={getOrderRequestQty(row, "cr1tr")} />
-                  {showDelivery ? <NumericCell value={row.cr1tr.delivery} /> : null}
-                  <RemarksCell value={row.remarksJunbikiS2} />
-                  <RemarksCell value={row.remarksPalletS2} />
-                  <RemarksCell value={row.remarksGapS2} />
-                  <td className="border-b border-slate-200 px-4 py-3 whitespace-nowrap">
-                    {row.statusOrder.toLowerCase() === "submitted" ? (
+                <tr key={`${row.code}-${row.rawDate}-${row.time}-${index}`} className="align-top">
+                  <TextTableCell value={row.date} group="identity" />
+                  <TextTableCell value={row.time} group="identity" />
+                  <TextTableCell value={row.code} group="identity" strong />
+                  <TextTableCell value={row.truckType} group="identity" />
+                  <NumericCell value={row.ritaseRequest} group="identity" />
+                  <td className="border-b border-r border-slate-200 bg-white px-4 py-3 whitespace-nowrap">
+                    <StatusBadge status={row.statusOrder} />
+                  </td>
+                  <NumericCell value={getOrderRequestQty(row, "cb1tr")} group="cb1tr" />
+                  <NumericCell value={row.cb1tr.delivery} group="cb1tr" />
+                  <NumericCell value={row.cb1tr.received ?? 0} group="cb1tr" />
+                  <NumericCell value={getOrderRequestQty(row, "cb2tr")} group="cb2tr" />
+                  <NumericCell value={row.cb2tr.delivery} group="cb2tr" />
+                  <NumericCell value={row.cb2tr.received ?? 0} group="cb2tr" />
+                  <NumericCell value={getOrderRequestQty(row, "camNo01")} group="camNo01" />
+                  <NumericCell value={row.camNo01.delivery} group="camNo01" />
+                  <NumericCell value={row.camNo01.received ?? 0} group="camNo01" />
+                  <NumericCell value={getOrderRequestQty(row, "camNo02")} group="camNo02" />
+                  <NumericCell value={row.camNo02.delivery} group="camNo02" />
+                  <NumericCell value={row.camNo02.received ?? 0} group="camNo02" />
+                  <NumericCell value={getOrderRequestQty(row, "cr1tr")} group="cr1tr" />
+                  <NumericCell value={row.cr1tr.delivery} group="cr1tr" />
+                  <NumericCell value={row.cr1tr.received ?? 0} group="cr1tr" />
+                  <RemarksCell value={row.remarksOrdering} />
+                  <RemarksCell value={row.remarksDelivery} />
+                  <RemarksCell value={row.remarksReceiving} />
+                  <td className="border-b border-r border-slate-200 bg-slate-50/70 px-4 py-3 whitespace-nowrap">
+                    {userRole === "ADMIN" || row.statusOrder.toLowerCase() === "submitted" ? (
                       <div className="flex gap-2">
-                        {row.truckType === "GAP" ? null : (
-                          <button
-                            type="button"
-                            onClick={() => onEdit(row)}
-                            disabled={loadingEditId === row.orderId || deletingId === row.orderId}
-                            className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
-                          >
-                            {loadingEditId === row.orderId ? "Membuka..." : "Edit"}
-                          </button>
-                        )}
                         <button
                           type="button"
-                          onClick={() => onRequestDelete(row)}
-                          disabled={deletingId === row.orderId}
-                          className="rounded-lg border border-rose-200 px-3 py-1.5 text-xs font-semibold text-rose-700 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
+                          onClick={() => onEdit(row)}
+                          disabled={loadingEditId === row.orderId || deletingId === row.orderId}
+                          className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
                         >
-                          {deletingId === row.orderId || pendingDeleteId === row.orderId ? "Delete" : "Delete"}
+                          {loadingEditId === row.orderId ? "Membuka..." : "Edit"}
                         </button>
+                        {row.statusOrder.toLowerCase() === "submitted" ? (
+                          <button
+                            type="button"
+                            onClick={() => onRequestDelete(row)}
+                            disabled={deletingId === row.orderId}
+                            className="rounded-lg border border-rose-200 px-3 py-1.5 text-xs font-semibold text-rose-700 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            {deletingId === row.orderId || pendingDeleteId === row.orderId ? "Delete" : "Delete"}
+                          </button>
+                        ) : null}
                       </div>
                     ) : (
                       <span className="rounded-full border border-slate-200 px-2.5 py-1 text-[11px] font-semibold text-slate-500">
@@ -930,9 +937,29 @@ function MetricRow({
   );
 }
 
-function NumericCell({ value }: { value: number }) {
+function TextTableCell({
+  value,
+  group,
+  strong,
+}: {
+  value: string;
+  group: OrderColumnGroupKey;
+  strong?: boolean;
+}) {
   return (
-    <td className="border-b border-slate-200 px-4 py-3 text-right whitespace-nowrap text-slate-700">
+    <td
+      className={`border-b border-r border-slate-200 px-4 py-3 whitespace-nowrap text-slate-700 ${getOrderGroupCellClassName(
+        group
+      )} ${strong ? "font-medium text-slate-900" : ""}`}
+    >
+      {value}
+    </td>
+  );
+}
+
+function NumericCell({ value, group = "identity" }: { value: number; group?: OrderColumnGroupKey }) {
+  return (
+    <td className={`border-b border-r border-slate-200 px-4 py-3 text-right whitespace-nowrap text-slate-700 tabular-nums ${getOrderGroupCellClassName(group)}`}>
       {formatNumber(value)}
     </td>
   );
@@ -944,10 +971,59 @@ function getOrderRequestQty(row: OrderReportRow, key: OrderItemSummary["key"]) {
 
 function RemarksCell({ value }: { value: string }) {
   return (
-    <td className="border-b border-slate-200 px-4 py-3 text-left text-slate-700">
-      <div className="min-w-[220px] whitespace-pre-wrap break-words">{value}</div>
+    <td className={`border-b border-r border-slate-200 px-4 py-3 text-left text-slate-700 ${getOrderGroupCellClassName("remarks")}`}>
+      <div className="min-w-[180px] whitespace-pre-wrap break-words">
+        {value && value !== "-" ? value : "-"}
+      </div>
     </td>
   );
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const normalized = status.toLowerCase();
+  const className =
+    normalized === "checked"
+      ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+      : normalized === "confirmed"
+        ? "border-sky-200 bg-sky-50 text-sky-700"
+        : normalized === "submitted"
+          ? "border-amber-200 bg-amber-50 text-amber-700"
+          : "border-slate-200 bg-slate-50 text-slate-700";
+
+  return <span className={`rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${className}`}>{status}</span>;
+}
+
+function buildOrderColumnGroups() {
+  return [
+    { key: "identity", label: "Informasi", colSpan: 6, className: "bg-slate-100 text-slate-700" },
+    { key: "cb1tr", label: "CB 1TR", colSpan: 3, className: "bg-emerald-50 text-emerald-900" },
+    { key: "cb2tr", label: "CB 2TR", colSpan: 3, className: "bg-sky-50 text-sky-900" },
+    { key: "camNo01", label: "Cam 01", colSpan: 3, className: "bg-violet-50 text-violet-900" },
+    { key: "camNo02", label: "Cam 02", colSpan: 3, className: "bg-rose-50 text-rose-900" },
+    { key: "cr1tr", label: "CR 1TR", colSpan: 3, className: "bg-amber-50 text-amber-900" },
+    { key: "remarks", label: "Remarks", colSpan: 3, className: "bg-slate-100 text-slate-700" },
+    { key: "actions", label: "Action", colSpan: 1, className: "bg-slate-900 text-white" },
+  ];
+}
+
+function getOrderGroupCellClassName(group: OrderColumnGroupKey) {
+  switch (group) {
+    case "cb1tr":
+      return "bg-emerald-50/40";
+    case "cb2tr":
+      return "bg-sky-50/50";
+    case "camNo01":
+      return "bg-violet-50/40";
+    case "camNo02":
+      return "bg-rose-50/40";
+    case "cr1tr":
+      return "bg-amber-50/50";
+    case "remarks":
+    case "actions":
+      return "bg-slate-50/70";
+    default:
+      return "bg-white";
+  }
 }
 
 function formatFilterLabel(value: OrderingFilter) {

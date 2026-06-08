@@ -6,6 +6,7 @@ import type {
   ReceivingQueueRow,
   ReceivingSummary,
 } from "@/lib/receiving-report";
+import type { AppRole } from "@/lib/roles";
 import dynamic from "next/dynamic";
 
 type ReceivingReportShellProps = {
@@ -15,6 +16,7 @@ type ReceivingReportShellProps = {
   selectedFilter: OrderingFilter;
   filterOptions: OrderingFilterOptions;
   errorMessage?: string | null;
+  userRole: AppRole;
 };
 
 const ReceivingReport = dynamic(() => import("@/components/receiving/ReceivingReport"), {

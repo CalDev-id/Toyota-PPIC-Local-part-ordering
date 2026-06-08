@@ -8,6 +8,7 @@ import type {
   ReceivingQueueRow,
   ReceivingSummary,
 } from "@/lib/receiving-report";
+import type { AppRole } from "@/lib/roles";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
@@ -20,6 +21,7 @@ type ReceivingReportProps = {
   selectedFilter: OrderingFilter;
   filterOptions: OrderingFilterOptions;
   errorMessage?: string | null;
+  userRole: AppRole;
 };
 
 export default function ReceivingReport({
@@ -29,6 +31,7 @@ export default function ReceivingReport({
   selectedFilter,
   filterOptions,
   errorMessage,
+  userRole,
 }: ReceivingReportProps) {
   const router = useRouter();
   const [selectedOrder, setSelectedOrder] = useState<ReceivingQueueRow | null>(null);
@@ -39,6 +42,7 @@ export default function ReceivingReport({
   const [formError, setFormError] = useState("");
   const [toastMessage, setToastMessage] = useState("");
   const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const orderRows = [...activeOrders, ...finishedOrders];
 
   useEffect(() => {
     return () => {
@@ -50,13 +54,13 @@ export default function ReceivingReport({
 
   function openCheckModal(order: ReceivingQueueRow) {
     setSelectedOrder(order);
-    setReceivedValues(Object.fromEntries(order.items.map((item) => [item.itemCode, String(item.qtyReceived || "")])));
+    setReceivedValues(Object.fromEntries(order.items.map((item) => [item.itemCode, String(item.qtyReceived ?? 0)])));
     setRemarkValues(Object.fromEntries(order.items.map((item) => [item.itemCode, item.remarksDelivery])));
     setCheckModes(
       Object.fromEntries(
         order.items.map((item) => [
           item.itemCode,
-          getReceivingCheckMode(String(item.qtyReceived || ""), item.remarksDelivery, item.qtyConfirm),
+          getReceivingCheckMode(String(item.qtyReceived ?? 0), item.remarksDelivery, item.qtyConfirm),
         ])
       )
     );
@@ -177,19 +181,12 @@ export default function ReceivingReport({
       </div>
 
       <QueueTable
-        title="Active Receiving"
-        description={`Order dengan status Confirmed untuk ${formatFilterLabel(selectedFilter)}.`}
-        rows={activeOrders}
-        showReceived={false}
-        onCheck={openCheckModal}
-      />
-
-      <QueueTable
-        title="Finish Receiving"
-        description={`Order dengan status Checked untuk ${formatFilterLabel(selectedFilter)}.`}
-        rows={finishedOrders}
+        title="Order List"
+        description={`Daftar order untuk ${formatFilterLabel(selectedFilter)}.`}
+        rows={orderRows}
         showReceived
-        onCheck={undefined}
+        onAction={openCheckModal}
+        getActionLabel={(order) => getReceivingActionLabel(order, userRole)}
       />
 
       {selectedOrder ? (
@@ -248,14 +245,18 @@ function QueueTable({
   description,
   rows,
   showReceived,
-  onCheck,
+  onAction,
+  getActionLabel,
 }: {
   title: string;
   description: string;
   rows: ReceivingQueueRow[];
   showReceived: boolean;
-  onCheck?: ((order: ReceivingQueueRow) => void) | undefined;
+  onAction?: ((order: ReceivingQueueRow) => void) | undefined;
+  getActionLabel?: ((order: ReceivingQueueRow) => string | null) | undefined;
 }) {
+  const showAction = Boolean(onAction && getActionLabel && rows.some((row) => getActionLabel(row)));
+
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white/95 shadow-sm">
       <div className="border-b border-slate-200 px-5 py-4">
@@ -265,54 +266,66 @@ function QueueTable({
 
       {rows.length === 0 ? (
         <div className="px-5 py-10 text-center text-sm text-slate-500">
-          Tidak ada data yang bisa ditampilkan pada section ini.
+          Tidak ada order pada filter ini.
         </div>
       ) : (
         <div className="overflow-x-auto">
-          <table className="min-w-full border-collapse text-sm">
-            <thead className="bg-slate-100/90 text-slate-700">
+          <table className="min-w-full border-separate border-spacing-0 text-sm">
+            <thead className="text-slate-700">
+              <tr>
+                {buildReceivingColumnGroups(showReceived, showAction).map((group) => (
+                  <th
+                    key={group.key}
+                    colSpan={group.colSpan}
+                    className={`border-b border-r border-slate-200 px-4 py-3 text-center text-xs font-bold uppercase tracking-[0.12em] whitespace-nowrap ${group.className}`}
+                  >
+                    {group.label}
+                  </th>
+                ))}
+              </tr>
               <tr>
                 {baseColumns.map((column) => (
                   <th
                     key={column.key}
-                    className={`border-b border-slate-200 px-4 py-3 font-semibold whitespace-nowrap ${
+                    className={`border-b border-r border-slate-200 bg-white px-4 py-3 font-semibold whitespace-nowrap ${
                       column.align === "right" ? "text-right" : "text-left"
                     }`}
                   >
                     {column.label}
                   </th>
                 ))}
-                {metricColumns.map((column) => (
+                <th className="border-b border-r border-slate-200 bg-white px-4 py-3 text-left font-semibold whitespace-nowrap">
+                  Status
+                </th>
+                {metricColumns.flatMap((column) => [
                   <th
                     key={`${column.key}-request`}
-                    className="border-b border-slate-200 px-4 py-3 text-right font-semibold whitespace-nowrap"
+                    className={`border-b border-r border-slate-200 px-4 py-3 text-right font-semibold whitespace-nowrap ${getReceivingGroupCellClassName(column.key)}`}
                   >
-                    {column.requestLabel}
-                  </th>
-                ))}
-                {metricColumns.map((column) => (
+                    Request
+                  </th>,
                   <th
                     key={`${column.key}-delivery`}
-                    className="border-b border-slate-200 px-4 py-3 text-right font-semibold whitespace-nowrap"
+                    className={`border-b border-r border-slate-200 px-4 py-3 text-right font-semibold whitespace-nowrap ${getReceivingGroupCellClassName(column.key)}`}
                   >
-                    {column.deliveryLabel}
-                  </th>
-                ))}
-                {showReceived
-                  ? metricColumns.map((column) => (
+                    Delivery
+                  </th>,
+                  ...(showReceived
+                    ? [
                       <th
                         key={`${column.key}-received`}
-                        className="border-b border-slate-200 px-4 py-3 text-right font-semibold whitespace-nowrap"
+                        className={`border-b border-r border-slate-200 px-4 py-3 text-right font-semibold whitespace-nowrap ${getReceivingGroupCellClassName(column.key)}`}
                       >
-                        {column.receivedLabel}
-                      </th>
-                    ))
-                  : null}
-                <th className="border-b border-slate-200 px-4 py-3 text-left font-semibold whitespace-nowrap">
+                        Received
+                      </th>,
+                    ]
+                    : []),
+                ])}
+                <th className="border-b border-r border-slate-200 bg-slate-50/70 px-4 py-3 text-left font-semibold whitespace-nowrap">
                   Remarks Delivery
                 </th>
-                {onCheck ? (
-                  <th className="border-b border-slate-200 px-4 py-3 text-left font-semibold whitespace-nowrap">
+                {showAction ? (
+                  <th className="border-b border-r border-slate-200 bg-slate-100 px-4 py-3 text-left font-semibold whitespace-nowrap">
                     Action
                   </th>
                 ) : null}
@@ -320,43 +333,52 @@ function QueueTable({
             </thead>
             <tbody>
               {rows.map((row) => (
-                <tr key={row.orderId} className="align-top odd:bg-white even:bg-slate-50/60">
-                  <TextCell value={row.kodeOrder} strong />
+                <tr key={row.orderId} className="align-top">
                   <TextCell value={row.tanggalOrder} />
-                  <TextCell value={row.shift} />
-                  <TextCell value={row.dayNight} />
+                  <TextCell value={row.time} />
+                  <TextCell value={row.kodeOrder} strong />
                   <TextCell value={row.truckType} />
                   <NumericCell value={row.ritaseRequest} />
-                  {metricColumns.map((column) => (
+                  <td className="border-b border-r border-slate-200 bg-white px-4 py-3 whitespace-nowrap">
+                    <StatusBadge status={row.statusOrder} />
+                  </td>
+                  {metricColumns.flatMap((column) => [
                     <NumericCell
                       key={`${row.orderId}-${column.key}-request`}
                       value={getRequestQty(row, column.key)}
-                    />
-                  ))}
-                  {metricColumns.map((column) => (
+                      group={column.key}
+                    />,
                     <NumericCell
                       key={`${row.orderId}-${column.key}-delivery`}
                       value={row[column.key].delivery}
-                    />
-                  ))}
-                  {showReceived
-                    ? metricColumns.map((column) => (
+                      group={column.key}
+                    />,
+                    ...(showReceived
+                      ? [
                         <NumericCell
                           key={`${row.orderId}-${column.key}-received`}
                           value={row[column.key].received ?? 0}
-                        />
-                      ))
-                    : null}
+                          group={column.key}
+                        />,
+                      ]
+                      : []),
+                  ])}
                   <RemarksCell value={row.remarksDelivery} />
-                  {onCheck ? (
-                    <td className="border-b border-slate-200 px-4 py-3 whitespace-nowrap">
-                      <button
-                        type="button"
-                        onClick={() => onCheck(row)}
-                        className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-slate-700"
-                      >
-                        Check
-                      </button>
+                  {showAction ? (
+                    <td className="border-b border-r border-slate-200 bg-slate-50/70 px-4 py-3 whitespace-nowrap">
+                      {getActionLabel?.(row) ? (
+                        <button
+                          type="button"
+                          onClick={() => onAction?.(row)}
+                          className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-slate-700"
+                        >
+                          {getActionLabel(row)}
+                        </button>
+                      ) : (
+                        <span className="rounded-full border border-slate-200 px-2.5 py-1 text-[11px] font-semibold text-slate-500">
+                          Locked
+                        </span>
+                      )}
                     </td>
                   ) : null}
                 </tr>
@@ -544,10 +566,9 @@ function MetaField({ label, value }: { label: string; value: string }) {
 }
 
 const baseColumns: Array<{ key: keyof ReceivingQueueRow; label: string; align?: "left" | "right" }> = [
-  { key: "kodeOrder", label: "Kode Order" },
-  { key: "tanggalOrder", label: "Tanggal Order" },
-  { key: "shift", label: "Shift" },
-  { key: "dayNight", label: "Day / Night" },
+  { key: "tanggalOrder", label: "Tanggal" },
+  { key: "time", label: "Waktu" },
+  { key: "kodeOrder", label: "Kode" },
   { key: "truckType", label: "Truck Type" },
   { key: "ritaseRequest", label: "Ritase", align: "right" },
 ];
@@ -620,7 +641,7 @@ function MetricRow({
 function TextCell({ value, strong }: { value: string; strong?: boolean }) {
   return (
     <td
-      className={`border-b border-slate-200 px-4 py-3 text-slate-700 ${
+      className={`border-b border-r border-slate-200 bg-white px-4 py-3 text-slate-700 ${
         strong ? "whitespace-nowrap font-medium text-slate-900" : ""
       }`}
     >
@@ -629,9 +650,9 @@ function TextCell({ value, strong }: { value: string; strong?: boolean }) {
   );
 }
 
-function NumericCell({ value }: { value: number }) {
+function NumericCell({ value, group }: { value: number; group?: ReceivingMetricKey }) {
   return (
-    <td className="border-b border-slate-200 px-4 py-3 text-right whitespace-nowrap text-slate-700">
+    <td className={`border-b border-r border-slate-200 px-4 py-3 text-right whitespace-nowrap text-slate-700 tabular-nums ${group ? getReceivingGroupCellClassName(group) : "bg-white"}`}>
       {formatNumber(value)}
     </td>
   );
@@ -639,10 +660,85 @@ function NumericCell({ value }: { value: number }) {
 
 function RemarksCell({ value }: { value: string }) {
   return (
-    <td className="border-b border-slate-200 px-4 py-3 text-left text-slate-700">
+    <td className="border-b border-r border-slate-200 bg-slate-50/70 px-4 py-3 text-left text-slate-700">
       <div className="min-w-[220px] whitespace-pre-wrap break-words">{value}</div>
     </td>
   );
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const normalized = status.toLowerCase();
+  const className =
+    normalized === "checked"
+      ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+      : normalized === "confirmed"
+        ? "border-sky-200 bg-sky-50 text-sky-700"
+        : normalized === "submitted"
+          ? "border-amber-200 bg-amber-50 text-amber-700"
+          : "border-slate-200 bg-slate-50 text-slate-700";
+
+  return <span className={`rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${className}`}>{status}</span>;
+}
+
+function buildReceivingColumnGroups(showReceived: boolean, showAction: boolean) {
+  return [
+    { key: "identity", label: "Informasi", colSpan: 6, className: "bg-slate-100 text-slate-700" },
+    ...metricColumns.map((column) => ({
+      key: column.key,
+      label: getReceivingMetricLabel(column.key),
+      colSpan: showReceived ? 3 : 2,
+      className: getReceivingGroupHeaderClassName(column.key),
+    })),
+    { key: "remarks", label: "Remarks", colSpan: 1, className: "bg-slate-100 text-slate-700" },
+    ...(showAction ? [{ key: "action", label: "Action", colSpan: 1, className: "bg-slate-900 text-white" }] : []),
+  ];
+}
+
+function getReceivingActionLabel(order: ReceivingQueueRow, userRole: AppRole) {
+  const status = order.statusOrder.toLowerCase();
+
+  if (status === "confirmed") {
+    return "Check";
+  }
+
+  if (status === "checked" || userRole === "ADMIN") {
+    return "Edit";
+  }
+
+  return null;
+}
+
+function getReceivingMetricLabel(key: ReceivingMetricKey) {
+  const labels: Record<ReceivingMetricKey, string> = {
+    cb1tr: "CB 1TR",
+    cb2tr: "CB 2TR",
+    camNo01: "Cam 01",
+    camNo02: "Cam 02",
+    cr1tr: "CR 1TR",
+  };
+  return labels[key];
+}
+
+function getReceivingGroupHeaderClassName(key: ReceivingMetricKey) {
+  const classes: Record<ReceivingMetricKey, string> = {
+    cb1tr: "bg-emerald-50 text-emerald-900",
+    cb2tr: "bg-sky-50 text-sky-900",
+    camNo01: "bg-violet-50 text-violet-900",
+    camNo02: "bg-rose-50 text-rose-900",
+    cr1tr: "bg-amber-50 text-amber-900",
+  };
+  return classes[key];
+}
+
+function getReceivingGroupCellClassName(key: ReceivingMetricKey) {
+  const classes: Record<ReceivingMetricKey, string> = {
+    cb1tr: "bg-emerald-50/40",
+    cb2tr: "bg-sky-50/50",
+    camNo01: "bg-violet-50/40",
+    camNo02: "bg-rose-50/40",
+    cr1tr: "bg-amber-50/50",
+  };
+  return classes[key];
 }
 
 function getReceivingCheckMode(

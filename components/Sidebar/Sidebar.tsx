@@ -2,6 +2,7 @@
 
 import type { AppRole } from "@/lib/roles";
 import { useSession } from "next-auth/react";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSyncExternalStore } from "react";
@@ -19,6 +20,18 @@ type MenuItem = {
   icon: React.ReactNode;
   roles?: AppRole[];
 };
+
+type AdminMenuGroup = {
+  label: string;
+  items: string[];
+};
+
+const adminMenuGroups: AdminMenuGroup[] = [
+  { label: "Overview", items: ["Home", "Analysis", "Tracking"] },
+  { label: "Ordering", items: ["Planning", "Ordering", "Recap", "Stock"] },
+  { label: "Fulfillment", items: ["Delivery", "Receiving", "Return Defect"] },
+  { label: "Admin", items: ["Manage Order", "Users"] },
+];
 
 const menuItems: MenuItem[] = [
   {
@@ -81,6 +94,30 @@ const menuItems: MenuItem[] = [
     ),
   },
   {
+    label: "Manage Order",
+    href: "/manage-order",
+    roles: ["ADMIN"],
+    icon: (
+      <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8">
+        <path d="M5 4h14v16H5z" />
+        <path d="M8 8h8M8 12h5" />
+        <path d="m15 17 4-4" />
+        <path d="m16 13 3 3" />
+      </svg>
+    ),
+  },
+  {
+    label: "Recap",
+    href: "/recap",
+    roles: ["ADMIN", "ORDERING"],
+    icon: (
+      <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8">
+        <path d="M5 4h14v16H5z" />
+        <path d="M8 8h8M8 12h8M8 16h5" />
+      </svg>
+    ),
+  },
+  {
     label: "Stock",
     href: "/ordering/stock",
     roles: ["ADMIN", "ORDERING"],
@@ -120,6 +157,19 @@ const menuItems: MenuItem[] = [
     ),
   },
   {
+    label: "Return Defect",
+    href: "/return-defect",
+    roles: ["ADMIN", "ORDERING", "DELIVERY"],
+    icon: (
+      <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8">
+        <path d="M5 8h10a4 4 0 0 1 0 8H8" />
+        <path d="m8 5-3 3 3 3" />
+        <path d="M8 16v3h10" />
+        <path d="m18 16 3 3-3 3" />
+      </svg>
+    ),
+  },
+  {
     label: "Tracking",
     href: "/tracking",
     icon: (
@@ -154,12 +204,44 @@ export default function Sidebar({
 }: SidebarProps) {
   const mounted = useMounted();
   const pathname = usePathname();
-  const { data: session } = useSession();
+  const { data: session, status: authStatus } = useSession();
 
   const userRole = mounted ? (session?.user?.role as AppRole | undefined) : undefined;
-  const visibleMenuItems = menuItems.filter(
-    (item) => !item.roles || (userRole && item.roles.includes(userRole))
-  );
+  const visibleMenuItems =
+    mounted && authStatus === "authenticated" && userRole
+      ? menuItems.filter((item) => !item.roles || item.roles.includes(userRole))
+      : [];
+  const adminMenuSections = adminMenuGroups
+    .map((group) => ({
+      ...group,
+      items: group.items
+        .map((label) => visibleMenuItems.find((item) => item.label === label))
+        .filter((item): item is MenuItem => Boolean(item)),
+    }))
+    .filter((group) => group.items.length > 0);
+  const showAdminGroups = userRole === "ADMIN";
+
+  function renderMenuItem(item: MenuItem) {
+    const isActive = pathname === item.href;
+
+    return (
+      <Link
+        key={item.href}
+        href={item.href}
+        onClick={onCloseMobile}
+        className={`group flex items-center gap-3 rounded-xl px-3 py-3 transition ${
+          isActive
+            ? "bg-[#d9fcf3] text-slate-500"
+            : "text-slate-500 hover:bg-black/5 hover:text-slate-500"
+        } ${collapsed ? "md:justify-center" : ""}`}
+      >
+        <span className={isActive ? "text-slate-500" : "text-slate-400 group-hover:text-slate-500"}>
+          {item.icon}
+        </span>
+        <span className={`text-md font-medium ${collapsed ? "md:hidden" : ""}`}>{item.label}</span>
+      </Link>
+    );
+  }
 
   return (
     <>
@@ -175,12 +257,19 @@ export default function Sidebar({
             }`}
           >
             <div
-              className={`overflow-hidden transition-all duration-300 ml-2 ${
+              className={`overflow-hidden transition-all duration-300 ml-0 ${
                 collapsed ? "w-0 opacity-0 md:hidden" : "w-auto opacity-100"
               }`}
             >
-              <p className="text-3xl font-semibold">TOYOTA</p>
-              <span className="text-slate-500">PAD - CCR Division</span>
+              <Image
+                src="/image/tmmin_logo.png"
+                alt="TMMIN"
+                width={150}
+                height={42}
+                priority
+                className="-ml-5 h-20 w-auto object-contain"
+              />
+              {/* <span className="text-slate-500">PAD - CCR Division</span> */}
             </div>
 
             {/* CLOSE BUTTON */}
@@ -210,26 +299,16 @@ export default function Sidebar({
 
           {/* MENU ITEMS */}
           <nav className="flex-1 space-y-2 p-3">
-            {visibleMenuItems.map((item) => {
-              const isActive = pathname === item.href;
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  onClick={onCloseMobile}
-                  className={`group flex items-center gap-3 rounded-xl px-3 py-3 transition ${
-                    isActive
-                      ? "bg-[#d9fcf3] text-slate-500"
-                      : "text-slate-500 hover:bg-black/5 hover:text-slate-500"
-                  } ${collapsed ? "md:justify-center" : ""}`}
-                >
-                  <span className={isActive ? "text-slate-500" : "text-slate-400 group-hover:text-slate-500"}>
-                    {item.icon}
-                  </span>
-                  <span className={`text-md font-medium ${collapsed ? "md:hidden" : ""}`}>{item.label}</span>
-                </Link>
-              );
-            })}
+            {showAdminGroups
+              ? adminMenuSections.map((group) => (
+                  <div key={group.label} className="space-y-1.5">
+                    <p className={`px-3 pt-2 text-xs font-semibold uppercase tracking-wide text-slate-400 ${collapsed ? "md:hidden" : ""}`}>
+                      {group.label}
+                    </p>
+                    <div className="space-y-1">{group.items.map(renderMenuItem)}</div>
+                  </div>
+                ))
+              : visibleMenuItems.map(renderMenuItem)}
           </nav>
 
           <div className={`border-t border-white/10 p-4 text-xs text-slate-400 ${collapsed ? "md:text-center" : ""}`}>

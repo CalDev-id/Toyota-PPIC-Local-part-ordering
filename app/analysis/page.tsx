@@ -1,6 +1,7 @@
 import DefaultLayout from "@/components/Layout/DefaultLayout";
 import AnalysisDashboard from "@/components/analysis/AnalysisDashboard";
 import {
+  createEmptyAnalysisDashboardData,
   getAnalysisDashboardData,
   resolveAnalysisContext,
   type AnalysisDashboardData,
@@ -28,11 +29,7 @@ export default async function AnalysisPage({ searchParams }: AnalysisPageProps) 
   });
 
   const filterOptions: AnalysisFilterOptions = options;
-  let dashboardData: AnalysisDashboardData = {
-    volumeOrderHarian: [],
-    requestVsConfirmedPerItem: [],
-    planRequestConfirmedWeekly: [],
-  };
+  let dashboardData: AnalysisDashboardData = createEmptyAnalysisDashboardData();
   const activeFilter: AnalysisFilter = selectedFilter;
   let errorMessage: string | null = null;
 

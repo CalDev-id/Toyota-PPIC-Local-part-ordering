@@ -47,6 +47,12 @@ export async function PUT(req: Request, context: RouteContext) {
       return NextResponse.json({ error: "Order tidak ditemukan" }, { status: 404 });
     }
 
+    const previousStatus = normalizeStatus(order.statusOrder);
+
+    if (previousStatus !== "confirmed" && previousStatus !== "checked") {
+      return NextResponse.json({ error: "Hanya order Confirmed atau Checked yang bisa diproses Receiving" }, { status: 409 });
+    }
+
     const detailIdsByCode = new Map(order.details.map((detail) => [detail.itemCode, detail.detailId]));
     const invalidItem = items.find((item) => !detailIdsByCode.has(item.itemCode));
 
@@ -78,14 +84,16 @@ export async function PUT(req: Request, context: RouteContext) {
       ),
     ]);
 
-    await createRoleNotification({
-      type: "RECEIVING_CHECKED",
-      title: "Receiving selesai",
-      message: `Order ${order.kodeOrder} sudah selesai di-check Receiving`,
-      kodeOrder: order.kodeOrder,
-      orderId: order.orderId,
-      targetRole: "ORDERING",
-    });
+    if (previousStatus !== "checked") {
+      await createRoleNotification({
+        type: "RECEIVING_CHECKED",
+        title: "Receiving selesai",
+        message: `Order ${order.kodeOrder} sudah selesai di-check Receiving`,
+        kodeOrder: order.kodeOrder,
+        orderId: order.orderId,
+        targetRole: "ORDERING",
+      });
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {
@@ -97,6 +105,10 @@ export async function PUT(req: Request, context: RouteContext) {
 
     return NextResponse.json({ error: "Gagal menyimpan receiving order" }, { status: 500 });
   }
+}
+
+function normalizeStatus(value: string | null | undefined) {
+  return value?.trim().toLowerCase() || "";
 }
 
 function normalizeItems(value: unknown): CheckReceivingItem[] {

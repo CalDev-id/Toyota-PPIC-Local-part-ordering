@@ -19,11 +19,12 @@ export default function DefaultLayout({ children }: DefaultLayoutProps) {
   const profileRef = useRef<HTMLDivElement | null>(null);
   const accessToastShowTimeoutRef = useRef<number | null>(null);
   const accessToastHideTimeoutRef = useRef<number | null>(null);
-  const { data: session } = useSession();
+  const { data: session, status: authStatus } = useSession();
   const mounted = useMounted();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const currentPage = getCurrentPageLabel(pathname);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -82,14 +83,28 @@ export default function DefaultLayout({ children }: DefaultLayoutProps) {
   const profileRole = mounted ? session?.user?.role || "-" : "-";
   const profileEmail = mounted ? session?.user?.email || "No email" : "No email";
 
+  if (!mounted || authStatus === "loading") {
+    return <div className="min-h-screen bg-[radial-gradient(circle_at_top,_#dbeafe_0%,_#eff6ff_35%,_#f8fafc_100%)]" />;
+  }
+
   async function handleLogout() {
     setLoggingOut(true);
     setProfileOpen(false);
-    await signOut({ callbackUrl: "/login" });
+    await signOut({ redirect: false, callbackUrl: "/login" });
+    window.location.replace("/login");
   }
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,_#dbeafe_0%,_#eff6ff_35%,_#f8fafc_100%)]">
+      {loggingOut ? (
+        <div className="fixed inset-0 z-[100] grid place-items-center bg-white/90 backdrop-blur-sm">
+          <div className="flex flex-col items-center gap-3 text-slate-700">
+            <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-emerald-600" />
+            <p className="text-sm font-semibold">Logging out...</p>
+          </div>
+        </div>
+      ) : null}
+
       <Sidebar
         collapsed={collapsed}
         mobileOpen={mobileOpen}
@@ -112,8 +127,8 @@ export default function DefaultLayout({ children }: DefaultLayoutProps) {
                 </svg>
               </button>
               <div>
-                <p className="text-sm font-semibold text-slate-900">Toyota Dashboard</p>
-                <p className="text-xs text-slate-500">Layout with collapsible sidebar</p>
+                <p className="text-sm font-semibold text-slate-900">CCR Ordering</p>
+                <p className="text-xs text-slate-500">{currentPage}</p>
               </div>
             </div>
             <div className="flex items-center gap-3">
@@ -185,6 +200,30 @@ export default function DefaultLayout({ children }: DefaultLayoutProps) {
       </div>
     </div>
   );
+}
+
+function getCurrentPageLabel(pathname: string) {
+  if (pathname === "/") {
+    return "Home";
+  }
+
+  const routeLabels: Array<[string, string]> = [
+    ["/ordering/junbiki", "Junbiki Order"],
+    ["/ordering/pallet", "Pallet Order"],
+    ["/ordering/stock", "Stock"],
+    ["/manage-order", "Manage Order"],
+    ["/ordering", "Ordering"],
+    ["/analysis", "Analysis"],
+    ["/planning", "Planning"],
+    ["/delivery", "Delivery"],
+    ["/receiving", "Receiving"],
+    ["/tracking", "Tracking"],
+    ["/recap", "Recap"],
+    ["/users", "Users"],
+    ["/profile", "Profile"],
+  ];
+
+  return routeLabels.find(([route]) => pathname.startsWith(route))?.[1] ?? "Dashboard";
 }
 
 function useMounted() {
